@@ -22,7 +22,11 @@ export async function GET() {
     r.zrange<string[]>(keys.museum, 0, 0, { rev: true }),
     getPotLamports(),
   ]);
-  const latest = latestIds[0] ? await getEntry(Number(latestIds[0])) : null;
+  const pastRounds = Array.from({ length: 12 }, (_, i) => round - 1 - i);
+  const [latest, pastPrompts] = await Promise.all([
+    latestIds[0] ? getEntry(Number(latestIds[0])) : null,
+    r.mget<(string | null)[]>(...pastRounds.map(keys.prompt)),
+  ]);
 
   return Response.json(
     {
@@ -35,6 +39,7 @@ export async function GET() {
         status: prevFinal?.status ?? (prevEntries > 0 ? "judging" : "empty"),
       },
       latest,
+      pastPrompts: pastPrompts.filter((p): p is string => !!p),
       pot: { sol: lamportsToSol(pot), treasury: treasuryAddress() },
     },
     { headers: { "cache-control": "no-store" } },

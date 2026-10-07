@@ -27,4 +27,6 @@ export const keys = {
   museumImg: (r: number) => `museum:${r}:img`,
   recentPrompts: "prompts:recent",
   potCache: "pot:cache",
+  /** Sorted set of rounds that received at least one submission. */
+  activeRounds: "rounds:active",
 };

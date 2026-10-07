@@ -3,7 +3,7 @@ import { keys, redis } from "@/lib/redis";
 import { GRACE_MS, Submission, roundAt, roundEnd } from "@/lib/rounds";
 import { isValidWallet } from "@/lib/solana";
 
-const TTL = 60 * 60 * 24 * 3;
+const TTL = 60 * 60 * 24 * 14;
 const PREFIX = "data:image/jpeg;base64,";
 const MAX_IMAGE_CHARS = 700_000;
 
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
   ]);
   await r.rpush(keys.subs(round), sub.id);
   await r.expire(keys.subs(round), TTL);
+  await r.zadd(keys.activeRounds, { score: round, member: String(round) });
 
   return Response.json({ ok: true, id: sub.id });
 }

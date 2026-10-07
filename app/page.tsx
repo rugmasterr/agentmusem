@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useReveal, useShell } from "@/components/AppShell";
 import DrawingCanvas, { CanvasHandle } from "@/components/DrawingCanvas";
-import { FramedArt, shortAddr } from "@/components/Placard";
+import { ArtFrame, Placard, shortAddr } from "@/components/Placard";
 import type { MuseumEntry } from "@/lib/rounds";
 
 type State = {
@@ -11,10 +13,12 @@ type State = {
   round: { id: number; start: number; end: number; prompt: string | null; entries: number };
   previous: { id: number; entries: number; status: "judging" | "empty" | "done" };
   latest: MuseumEntry | null;
+  pastPrompts: string[];
   pot: { sol: number; treasury: string | null };
 };
 
 const GRACE_MS = 5000;
+const isSol = (a: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a);
 
 function load(key: string) {
   try {
@@ -29,23 +33,46 @@ function save(key: string, v: string) {
   } catch {}
 }
 
+/** Types the commission out like the original design, re-running whenever the text changes. */
+function useTyped(text: string | null) {
+  const [out, setOut] = useState("");
+  useEffect(() => {
+    if (!text) return setOut("");
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return setOut(text);
+    let i = 0;
+    setOut("");
+    const t = setInterval(() => {
+      setOut(text.slice(0, ++i));
+      if (i >= text.length) clearInterval(t);
+    }, 38);
+    return () => clearInterval(t);
+  }, [text]);
+  return out;
+}
+
 export default function Studio() {
+  const { pubkey, connect, toast } = useShell();
   const [state, setState] = useState<State | null>(null);
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState(0);
   const [artist, setArtist] = useState("");
-  const [wallet, setWallet] = useState("");
+  const [addr, setAddr] = useState("");
   const [title, setTitle] = useState("");
-  const [submittedRound, setSubmittedRound] = useState<number | null>(null);
+  const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [submitted, setSubmitted] = useState<{ round: number; img: string; title: string; artist: string } | null>(null);
   const canvas = useRef<CanvasHandle>(null);
   const roundRef = useRef<number | null>(null);
+  useReveal();
 
   useEffect(() => {
     setArtist(load("artist"));
-    setWallet(load("wallet"));
+    setAddr(load("wallet"));
   }, []);
+
+  useEffect(() => {
+    if (pubkey) setAddr((a) => a || pubkey);
+  }, [pubkey]);
 
   const poll = useCallback(async () => {
     try {
@@ -53,186 +80,309 @@ export default function Studio() {
       const res = await fetch("/api/state", { cache: "no-store" });
       if (!res.ok) return;
       const s: State = await res.json();
-      const t1 = Date.now();
-      setOffset(s.now - (t0 + t1) / 2);
+      setOffset(s.now - (t0 + Date.now()) / 2);
       setState(s);
       if (roundRef.current !== null && roundRef.current !== s.round.id) {
         canvas.current?.reset();
         setTitle("");
-        setMsg(null);
+        setErr("");
+        toast("New commission from the Curator!");
       }
       roundRef.current = s.round.id;
     } catch {}
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     poll();
     const p = setInterval(poll, 3000);
-    const t = setInterval(() => setNow(Date.now()), 200);
+    const t = setInterval(() => setNow(Date.now()), 250);
     return () => {
       clearInterval(p);
       clearInterval(t);
     };
   }, [poll]);
 
+  const typed = useTyped(state?.round.prompt ?? null);
   const serverNow = now + offset;
-  const remaining = state ? Math.max(0, state.round.end - serverNow) : 0;
+  const left = state ? Math.max(0, state.round.end - serverNow) : 0;
+  const secs = Math.ceil(left / 1000);
   const closed = state ? serverNow > state.round.end + GRACE_MS : false;
-  const submitted = state && submittedRound === state.round.id;
-  const mm = Math.floor(remaining / 60000);
-  const ss = Math.floor((remaining % 60000) / 1000);
-  const urgent = remaining < 30_000;
-  const progress = state ? 1 - remaining / state.roundMs : 0;
+  const hasSubmitted = !!state && submitted?.round === state.round.id;
 
-  async function submit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setErr("");
     if (!state || !canvas.current) return;
-    if (canvas.current.isBlank()) return setMsg({ ok: false, text: "The canvas is empty — draw something first!" });
+    const name = artist.trim();
+    const wallet = addr.trim();
+    if (hasSubmitted) return setErr("You already entered this round. Wait for the next commission.");
+    if (closed) return setErr("Time's up for this round. A new commission is coming.");
+    if (canvas.current.isBlank()) return setErr("The canvas is empty. Draw the commission first.");
+    if (!name) return setErr("Add your artist name.");
+    if (!isSol(wallet)) return setErr("That doesn’t look like a Solana address. Paste your public address or use Phantom.");
     setBusy(true);
-    setMsg(null);
-    save("artist", artist);
+    save("artist", name);
     save("wallet", wallet);
+    const img = canvas.current.toJpeg();
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ round: state.round.id, artist, title, wallet, image: canvas.current.toJpeg() }),
+        body: JSON.stringify({ round: state.round.id, artist: name, title, wallet, image: img }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Submission failed");
-      setSubmittedRound(state.round.id);
-      setMsg({ ok: true, text: "Submitted! The Curator will judge when the timer hits zero." });
+      setSubmitted({ round: state.round.id, img, title: title.trim() || "Untitled", artist: name });
+      toast("Entry received. Good luck!");
       poll();
-    } catch (err) {
-      setMsg({ ok: false, text: (err as Error).message });
+    } catch (error) {
+      setErr((error as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
+  const ticker = state?.pastPrompts.length ? state.pastPrompts : null;
+  const latest = state?.latest;
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6">
-      {/* Commission banner */}
-      <section className="relative overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5 sm:p-7">
-        <div className="absolute inset-x-0 top-0 h-1 bg-white/5">
-          <div className={`h-full transition-[width] duration-200 ${urgent ? "bg-red-500" : "bg-[var(--gold)]"}`} style={{ width: `${progress * 100}%` }} />
-        </div>
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gold)]">
-              The Curator requests · Round #{state?.round.id ?? "…"}
-            </div>
-            <h1 className="mt-2 font-serif text-3xl leading-tight sm:text-5xl">
-              {state?.round.prompt ? `“${state.round.prompt}”` : <span className="animate-pulse text-[var(--muted)]">The Curator is thinking…</span>}
-            </h1>
+    <>
+      {ticker && (
+        <div className="ticker" aria-hidden="true">
+          <div className="run">
+            {[...ticker, ...ticker].map((p, i) => (
+              <span key={i}>Past commission: {p}</span>
+            ))}
           </div>
-          <div className="flex shrink-0 items-end gap-6">
-            <Stat label="Pot" value={`${(state?.pot.sol ?? 0).toFixed(3)} SOL`} />
-            <Stat label="Entries" value={String(state?.round.entries ?? 0)} />
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-widest text-[var(--muted)]">Time left</div>
-              <div className={`font-mono text-4xl tabular-nums sm:text-5xl ${urgent ? "text-red-400" : ""}`}>
-                {mm}:{ss.toString().padStart(2, "0")}
+        </div>
+      )}
+
+      <main className="wrap" id="top">
+        <header className="hero">
+          <div style={{ minWidth: 0 }}>
+            <div className="kicker glass">
+              <span className="live-dot" />
+              Round <b>#{state?.round.id ?? "—"}</b> is open
+            </div>
+            <h1>
+              <span className="l">
+                <span>Draw for the</span>
+              </span>
+              <span className="l">
+                <span>
+                  <em>AI Curator.</em>
+                </span>
+              </span>
+            </h1>
+            <p className="lede">
+              Every 5 minutes an AI agent commissions a new artwork. You have 5 minutes to draw it by hand. The Curator hangs its favourite in the
+              museum and pays the artist in SOL.
+            </p>
+            <div className="ctas">
+              <a className="btn btn-solid" href="#studio">
+                Start drawing
+              </a>
+              <Link className="btn btn-glass" href="/submissions">
+                See all entries
+              </Link>
+            </div>
+          </div>
+
+          <aside className="glass brief" aria-label="Current commission">
+            <div className="brief-top">
+              <div className="curator">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="9" cy="10" r="1.2" />
+                  <circle cx="15" cy="10" r="1.2" />
+                  <path d="M8.5 15c1 1 2.2 1.5 3.5 1.5s2.5-.5 3.5-1.5" />
+                </svg>
+              </div>
+              <div>
+                <div className="who">The Curator requests</div>
+                <div className="round">Round #{state?.round.id ?? "—"}</div>
+              </div>
+            </div>
+            <div className="label">This round&apos;s commission</div>
+            <div className="prompt" aria-live="polite">
+              <span>{state?.round.prompt ? typed : "The Curator is thinking…"}</span>
+              <span className="caret" />
+            </div>
+            <div className="stats">
+              <div className="stat">
+                <div className="label">Pot</div>
+                <div className="v">
+                  {(state?.pot.sol ?? 0).toFixed(3)}
+                  <small>SOL</small>
+                </div>
+              </div>
+              <div className="stat">
+                <div className="label">Entries</div>
+                <div className="v">{state?.round.entries ?? 0}</div>
+              </div>
+              <div className="stat">
+                <div className="label">Time left</div>
+                <div className="v" style={{ color: state && secs <= 30 ? "var(--rose)" : undefined }}>
+                  {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}
+                </div>
+              </div>
+            </div>
+            <div className="timebar">
+              <i style={{ transform: `scaleX(${state ? left / state.roundMs : 1})` }} />
+            </div>
+            <div className="demo">
+              {state?.previous.status === "judging" ? (
+                <>
+                  Judging round #{state.previous.id} · {state.previous.entries} entr{state.previous.entries === 1 ? "y" : "ies"}…
+                </>
+              ) : state?.pot.treasury ? (
+                <>
+                  Treasury{" "}
+                  <a href={`https://solscan.io/account/${state.pot.treasury}`} target="_blank" rel="noreferrer">
+                    {shortAddr(state.pot.treasury)}
+                  </a>{" "}
+                  · live on Solana
+                </>
+              ) : (
+                "Live round"
+              )}
+            </div>
+          </aside>
+        </header>
+
+        <section id="studio" style={{ paddingTop: 40 }}>
+          <div className="studio">
+            <div className="glass easel rv">
+              <DrawingCanvas ref={canvas} disabled={hasSubmitted || closed} />
+            </div>
+
+            <form className="glass entry rv" noValidate onSubmit={onSubmit}>
+              <h3>Submit your piece</h3>
+              <p className="small">One entry per wallet per round. Winnings go straight to your wallet.</p>
+              <div className="form">
+                <div>
+                  <label htmlFor="artist">Artist name</label>
+                  <input type="text" id="artist" placeholder="e.g. lowpoly.lou" maxLength={32} value={artist} onChange={(e) => setArtist(e.target.value)} />
+                </div>
+                <div>
+                  <label htmlFor="title">
+                    Title <i>(optional)</i>
+                  </label>
+                  <input type="text" id="title" placeholder="Untitled" maxLength={48} value={title} onChange={(e) => setTitle(e.target.value)} />
+                </div>
+                <div>
+                  <label htmlFor="addr">Solana wallet</label>
+                  <div className="walletrow">
+                    <input
+                      type="text"
+                      id="addr"
+                      className="mono"
+                      placeholder="Public address"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={addr}
+                      onChange={(e) => setAddr(e.target.value.trim())}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-glass use-ph"
+                      onClick={async () => {
+                        const k = pubkey ?? (await connect());
+                        if (k) setAddr(k);
+                      }}
+                    >
+                      Use Phantom
+                    </button>
+                  </div>
+                </div>
+                <div className="err" role="alert">
+                  {err}
+                </div>
+                <button className="btn btn-solid" type="submit" disabled={busy || hasSubmitted || closed || !state?.round.prompt}>
+                  {hasSubmitted ? "Entered ✓" : closed ? "Time's up" : busy ? "Submitting…" : "Submit to the Curator"}
+                </button>
+                {hasSubmitted && submitted && (
+                  <div className="submitted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img alt="" src={submitted.img} />
+                    <div>
+                      <b>{submitted.title}</b>
+                      <span>
+                        Entered as {submitted.artist}. Waiting for the Curator. <Link href="/submissions" style={{ textDecoration: "underline" }}>See all entries</Link>
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <p className="fine">Public address only. Never paste a seed phrase or private key anywhere on this site.</p>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section id="museum">
+          <div className="acq">
+            <div className="rv" style={{ position: "relative" }}>
+              {latest ? (
+                <ArtFrame src={`/api/art/${latest.round}`} alt={latest.title} />
+              ) : (
+                <div className="frame">
+                  <div className="mat">
+                    <div className="bare">
+                      <div>
+                        <b>The walls are bare.</b>
+                        <span>Be the first artist hung in the museum.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="rv" style={{ minWidth: 0 }}>
+              <div className="eyebrow">Latest acquisition</div>
+              <h2>
+                Hung permanently. <em>Paid instantly.</em>
+              </h2>
+              <p className="sub">Every winning piece joins the permanent collection with the artist&apos;s name, title, round and payout on its placard.</p>
+              {latest ? (
+                <Placard entry={latest} />
+              ) : (
+                <div className="placard glass">
+                  <span className="t">Awaiting first work</span>
+                  <span className="m">Round — · — SOL paid</span>
+                </div>
+              )}
+              <div style={{ marginTop: 20 }}>
+                <Link className="btn btn-glass" href="/museum">
+                  Visit the museum
+                </Link>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* Easel */}
-        <section className="min-w-0">
-          <DrawingCanvas ref={canvas} disabled={!!submitted || closed} />
-
-          <form onSubmit={submit} className="mt-5 grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 sm:grid-cols-2">
-            <Field label="Artist name" value={artist} onChange={setArtist} placeholder="Anonymous Picasso" max={32} required />
-            <Field label="Title (optional)" value={title} onChange={setTitle} placeholder="Let the Curator name it" max={48} />
-            <div className="sm:col-span-2">
-              <Field
-                label="Your Solana wallet (public address) — winnings are sent here automatically"
-                value={wallet}
-                onChange={(v) => setWallet(v.trim())}
-                placeholder="e.g. 7xKX…"
-                mono
-                required
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-              <button
-                type="submit"
-                disabled={busy || !!submitted || closed || !state?.round.prompt}
-                className="rounded-lg bg-[var(--gold)] px-6 py-3 font-semibold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {submitted ? "Submitted ✓" : closed ? "Time's up" : busy ? "Hanging…" : "Submit to the Curator"}
-              </button>
-              {msg && <span className={`text-sm ${msg.ok ? "text-emerald-400" : "text-red-400"}`}>{msg.text}</span>}
-            </div>
-          </form>
         </section>
 
-        {/* Sidebar */}
-        <aside className="flex flex-col gap-6">
-          {state && state.previous.status === "judging" && (
-            <div className="rounded-xl border border-[var(--gold)]/40 bg-[var(--gold)]/10 p-4 text-sm">
-              <div className="font-semibold text-[var(--gold)]">Judging round #{state.previous.id}…</div>
-              <div className="mt-1 text-[var(--muted)]">The Curator is studying {state.previous.entries} entr{state.previous.entries === 1 ? "y" : "ies"} and will hang a winner shortly.</div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5">
-            <div className="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gold)]">Latest acquisition</div>
-            {state?.latest ? (
-              <FramedArt entry={state.latest} />
-            ) : (
-              <p className="text-sm text-[var(--muted)]">The walls are bare. Be the first artist hung in the museum.</p>
-            )}
+        <section id="how">
+          <div className="rv">
+            <div className="eyebrow">How it works</div>
+            <h2>
+              Five minutes. <em>One winner.</em>
+            </h2>
           </div>
-
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5 text-sm leading-relaxed text-[var(--muted)]">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gold)]">How it works</div>
-            <ol className="list-decimal space-y-2 pl-4">
-              <li>Every 5 minutes an AI agent — the Curator — commissions a new piece.</li>
-              <li>You have 5 minutes to draw it by hand on the canvas.</li>
-              <li>Submit with your Solana wallet address. One entry per wallet per round.</li>
-              <li>When time runs out the Curator picks its favorite, hangs it in the museum forever, and automatically pays the artist all project fees collected in the treasury.</li>
-              <li>No entries? The pot rolls over to the next round.</li>
-            </ol>
-            {state?.pot.treasury && (
-              <p className="mt-4 break-all text-xs">
-                Treasury:{" "}
-                <a className="font-mono underline decoration-dotted hover:text-[var(--gold)]" href={`https://solscan.io/account/${state.pot.treasury}`} target="_blank" rel="noreferrer">
-                  {shortAddr(state.pot.treasury)}
-                </a>
-              </p>
-            )}
+          <div className="steps">
+            {[
+              ["The commission", "Every 5 minutes the Curator, an AI agent, requests a new piece."],
+              ["You draw", "You have 5 minutes to draw it by hand on the canvas."],
+              ["You submit", "Enter your Solana wallet. One entry per wallet per round."],
+              ["The Curator picks", "Its favourite is hung for good, and the artist gets every fee in the treasury."],
+              ["Or it rolls over", "No entries? The pot carries into the next round."],
+            ].map(([h, p], i) => (
+              <div className="glass step rv" key={h}>
+                <div className="n">{i + 1}</div>
+                <h4>{h}</h4>
+                <p>{p}</p>
+              </div>
+            ))}
           </div>
-        </aside>
-      </div>
-    </main>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="text-right">
-      <div className="text-[10px] uppercase tracking-widest text-[var(--muted)]">{label}</div>
-      <div className="font-mono text-xl tabular-nums text-[var(--gold)]">{value}</div>
-    </div>
-  );
-}
-
-function Field(props: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; max?: number; mono?: boolean; required?: boolean }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-xs text-[var(--muted)]">
-      {props.label}
-      <input
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        placeholder={props.placeholder}
-        maxLength={props.max}
-        required={props.required}
-        className={`rounded-lg border border-[var(--line)] bg-black/30 px-3 py-2.5 text-sm text-[var(--fg)] outline-none placeholder:text-white/25 focus:border-[var(--gold)] ${props.mono ? "font-mono" : ""}`}
-      />
-    </label>
+        </section>
+      </main>
+    </>
   );
 }
