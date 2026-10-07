@@ -6,7 +6,7 @@ import { shortAddr, useShell } from "@/components/AppShell";
 import type { Submission } from "@/lib/rounds";
 
 type RoundInfo = { id: number; prompt: string | null; status: "open" | "judging" | "done" | "empty"; winnerId: string | null; winnerTitle: string | null };
-type Data = { round: RoundInfo | null; entries?: Submission[]; rounds: { id: number; prompt: string | null; entries: number }[]; current: number };
+type Data = { round: RoundInfo | null; entries?: Submission[]; remarks?: Record<string, string>; rounds: { id: number; prompt: string | null; entries: number }[]; current: number };
 
 const STATUS: Record<RoundInfo["status"], string> = {
   open: "Open · drawing now",
@@ -137,6 +137,7 @@ export default function Submissions() {
                       <span className="m">
                         {shortAddr(s.wallet)} · {timeAgo(s.createdAt)}
                       </span>
+                      {data?.remarks?.[s.id] && <span className="remark">“{data.remarks[s.id]}” — the Critic</span>}
                     </div>
                   </div>
                 ))}

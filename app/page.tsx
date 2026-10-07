@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useReveal, useShell } from "@/components/AppShell";
+import { Review, ReviewStage } from "@/components/Critic";
 import DrawingCanvas, { CanvasHandle } from "@/components/DrawingCanvas";
 import { ArtFrame, Placard, shortAddr } from "@/components/Placard";
 import type { MuseumEntry } from "@/lib/rounds";
@@ -13,6 +14,7 @@ type State = {
   round: { id: number; start: number; end: number; prompt: string | null; entries: number };
   previous: { id: number; entries: number; status: "judging" | "empty" | "done" };
   latest: MuseumEntry | null;
+  review: Review | null;
   pastPrompts: string[];
   pot: { sol: number; treasury: string | null };
 };
@@ -51,7 +53,7 @@ function useTyped(text: string | null) {
 }
 
 export default function Studio() {
-  const { pubkey, connect, toast } = useShell();
+  const { pubkey, connect, toast, setCriticBusy } = useShell();
   const [state, setState] = useState<State | null>(null);
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState(0);
@@ -101,6 +103,12 @@ export default function Studio() {
       clearInterval(t);
     };
   }, [poll]);
+
+  const onStage = !!state?.review?.entries.length;
+  useEffect(() => {
+    setCriticBusy(onStage);
+    return () => setCriticBusy(false);
+  }, [onStage, setCriticBusy]);
 
   const typed = useTyped(state?.round.prompt ?? null);
   const serverNow = now + offset;
@@ -248,6 +256,8 @@ export default function Studio() {
             </div>
           </aside>
         </header>
+
+        {onStage && state?.review && <ReviewStage review={state.review} />}
 
         <section id="studio" style={{ paddingTop: 40 }}>
           <div className="studio">

@@ -1,10 +1,15 @@
 import { after } from "next/server";
 import { finalizePending, getEntry, getOrCreatePrompt, getPotLamports } from "@/lib/game";
 import { keys, redis } from "@/lib/redis";
-import { ROUND_MS, RoundFinal, roundAt, roundEnd, roundStart } from "@/lib/rounds";
+import { ROUND_MS, RoundFinal, Submission, roundAt, roundEnd, roundStart } from "@/lib/rounds";
 import { lamportsToSol, treasuryAddress } from "@/lib/solana";
 
 export const maxDuration = 300;
+
+/** How long into a new round the critic's walkthrough of the previous round stays on stage. */
+const SHOW_MS = 100_000;
+/** Max pieces the critic walks past on stage. */
+const STAGE_MAX = 24;
 
 export async function GET() {
   const now = Date.now();
@@ -28,6 +33,26 @@ export async function GET() {
     r.mget<(string | null)[]>(...pastRounds.map(keys.prompt)),
   ]);
 
+  const prevStatus = prevFinal?.status ?? (prevEntries > 0 ? "judging" : "empty");
+  let review = null;
+  if (prevEntries > 0 && (prevStatus === "judging" || now - roundStart(round) < SHOW_MS)) {
+    const ids = await r.lrange<string>(keys.subs(round - 1), 0, STAGE_MAX - 1);
+    const [metas, remarks] = await Promise.all([
+      r.mget<(Submission | null)[]>(...ids.map(keys.sub)),
+      r.get<Record<string, string>>(keys.review(round - 1)),
+    ]);
+    const winner = prevStatus === "done" && latest?.round === round - 1 ? latest : null;
+    review = {
+      round: round - 1,
+      total: prevEntries,
+      entries: metas.filter((m): m is Submission => !!m).map((m) => ({ id: m.id, artist: m.artist, title: m.title })),
+      remarks: remarks ?? {},
+      winnerId: winner?.submissionId ?? null,
+      winnerTitle: winner?.title ?? null,
+      critique: winner?.critique ?? null,
+    };
+  }
+
   return Response.json(
     {
       now,
@@ -36,9 +61,10 @@ export async function GET() {
       previous: {
         id: round - 1,
         entries: prevEntries,
-        status: prevFinal?.status ?? (prevEntries > 0 ? "judging" : "empty"),
+        status: prevStatus,
       },
       latest,
+      review,
       pastPrompts: pastPrompts.filter((p): p is string => !!p),
       pot: { sol: lamportsToSol(pot), treasury: treasuryAddress() },
     },

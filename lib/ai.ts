@@ -86,7 +86,8 @@ Reply ONLY with JSON: {"prompt": "<the commission, max 14 words, no quotes>"}`,
   return prompt.slice(0, 140);
 }
 
-export type Verdict = { index: number; title: string; critique: string };
+/** `comments[i]` is the critic's one-liner for drawing i (same order as the input images). */
+export type Verdict = { index: number; title: string; critique: string; comments: string[] };
 
 async function judgeBatch(prompt: string, images: string[], final: boolean): Promise<Verdict> {
   const parts: Part[] = [
@@ -94,7 +95,8 @@ async function judgeBatch(prompt: string, images: string[], final: boolean): Pro
       type: "text",
       text: `Your commission was: "${prompt}".
 ${images.length} humans submitted drawings. They are numbered 1..${images.length} in order below. ${final ? "Pick ONE favorite to hang in the museum forever. Its artist gets paid." : "Pick the strongest one to advance to the final round."}
-Judge on: how well it answers the commission, creativity, effort, humor and charm. Ignore blank, offensive or spam entries.`,
+Judge on: how well it answers the commission, creativity, effort, humor and charm. Ignore blank, offensive or spam entries.
+You are also performing live as a snooty, mustachioed art critic strolling past each piece: give every drawing a one-line spoken remark (max 14 words, theatrical and funny, specific to what you see, never cruel).`,
     },
   ];
   images.forEach((img, i) => {
@@ -103,30 +105,32 @@ Judge on: how well it answers the commission, creativity, effort, humor and char
   });
   parts.push({
     type: "text",
-    text: `Reply ONLY with JSON: {"winner": <number 1-${images.length}>, "title": "<a gallery placard title for the winning piece, max 6 words>", "critique": "<your curator's note on why it won, 1-2 vivid sentences>"}`,
+    text: `Reply ONLY with JSON: {"comments": [<${images.length} strings, one remark per drawing in order>], "winner": <number 1-${images.length}>, "title": "<a gallery placard title for the winning piece, max 6 words>", "critique": "<your curator's note on why it won, 1-2 vivid sentences>"}`,
   });
   const text = await chat(CURATOR, parts, 8000, 120000);
-  const v = parseJson<{ winner: number; title: string; critique: string }>(text);
+  const v = parseJson<{ winner: number; title: string; critique: string; comments?: unknown[] }>(text);
   const index = Math.min(Math.max(Math.round(Number(v.winner)) - 1, 0), images.length - 1);
-  return { index, title: String(v.title ?? "Untitled").slice(0, 80), critique: String(v.critique ?? "").slice(0, 400) };
+  const comments = images.map((_, i) => String(v.comments?.[i] ?? "").slice(0, 160));
+  return { index, title: String(v.title ?? "Untitled").slice(0, 80), critique: String(v.critique ?? "").slice(0, 400), comments };
 }
 
 const BATCH = 16;
 
 /** Judges any number of drawings: batches of BATCH pick semifinalists, then a final round picks the winner. */
 export async function judge(prompt: string, images: string[]): Promise<Verdict> {
-  if (images.length === 1) {
-    const v = await judgeBatch(prompt, images, true);
-    return { ...v, index: 0 };
-  }
   if (images.length <= BATCH) return judgeBatch(prompt, images, true);
   const groups: number[][] = [];
   for (let i = 0; i < images.length; i += BATCH) groups.push(images.slice(i, i + BATCH).map((_, j) => i + j));
+  const comments: string[] = new Array(images.length).fill("");
   const semis = await Promise.all(
-    groups.map(async (g) => g[(await judgeBatch(prompt, g.map((i) => images[i]), false)).index]),
+    groups.map(async (g) => {
+      const v = await judgeBatch(prompt, g.map((i) => images[i]), false);
+      g.forEach((imgIdx, j) => (comments[imgIdx] = v.comments[j]));
+      return g[v.index];
+    }),
   );
   const v = await judgeBatch(prompt, semis.map((i) => images[i]), true);
-  return { ...v, index: semis[v.index] };
+  return { ...v, index: semis[v.index], comments };
 }
 
 export const FALLBACK_PROMPTS = [

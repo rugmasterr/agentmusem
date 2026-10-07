@@ -15,11 +15,12 @@ export async function GET(req: Request) {
   if (round === undefined) return Response.json({ round: null, rounds, current: roundAt(Date.now()) });
 
   const ids = await r.lrange<string>(keys.subs(round), 0, -1);
-  const [prompt, final, winner, subs] = await Promise.all([
+  const [prompt, final, winner, subs, remarks] = await Promise.all([
     r.get<string>(keys.prompt(round)),
     r.get<RoundFinal>(keys.final(round)),
     r.get<MuseumEntry>(keys.museumEntry(round)),
     ids.length ? r.mget<(Submission | null)[]>(...ids.map(keys.sub)) : Promise.resolve([]),
+    r.get<Record<string, string>>(keys.review(round)),
   ]);
   const current = roundAt(Date.now());
   const status = round === current ? "open" : final?.status === "done" ? "done" : final ? "empty" : ids.length ? "judging" : "empty";
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
     {
       round: { id: round, prompt, status, winnerId: winner?.submissionId ?? null, winnerTitle: winner?.title ?? null },
       entries: subs.filter(Boolean).reverse(),
+      remarks: remarks ?? {},
       rounds,
       current,
     },

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { WanderingCritic } from "./Critic";
 
 type PhantomProvider = {
   isPhantom?: boolean;
@@ -15,9 +16,11 @@ type Shell = {
   pubkey: string | null;
   connect: () => Promise<string | null>;
   toast: (msg: string) => void;
+  /** True while a page has the critic busy on stage (so the wandering one steps off). */
+  setCriticBusy: (busy: boolean) => void;
 };
 
-const ShellContext = createContext<Shell>({ pubkey: null, connect: async () => null, toast: () => {} });
+const ShellContext = createContext<Shell>({ pubkey: null, connect: async () => null, toast: () => {}, setCriticBusy: () => {} });
 export const useShell = () => useContext(ShellContext);
 
 export const shortAddr = (k: string) => `${k.slice(0, 4)}…${k.slice(-4)}`;
@@ -41,6 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState("");
   const [toastOn, setToastOn] = useState(false);
+  const [criticBusy, setCriticBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const toast = useCallback((msg: string) => {
@@ -87,7 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <ShellContext.Provider value={{ pubkey, connect, toast }}>
+    <ShellContext.Provider value={{ pubkey, connect, toast, setCriticBusy }}>
       <div className="wrap navbar">
         <div className="glass">
           <Link className="logo" href="/">
@@ -138,6 +142,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span>Payouts in SOL on Solana.</span>
         </footer>
       </div>
+
+      {!criticBusy && <WanderingCritic />}
 
       <div className={`glass toast${toastOn ? " show" : ""}`} role="status" aria-live="polite">
         {toastMsg}

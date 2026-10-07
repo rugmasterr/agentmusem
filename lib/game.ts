@@ -77,9 +77,12 @@ async function finalizeRound(round: number): Promise<void> {
       index: Math.abs(round * 2654435761) % subs.length,
       title: "Untitled (Chosen by Fate)",
       critique: "The Curator's circuits overheated while deliberating, so fate itself hung this piece.",
+      comments: [] as string[],
     };
   }
   const winner = subs[verdict.index];
+  const remarks = Object.fromEntries(subs.map((x, i) => [x.s.id, verdict.comments[i] ?? ""]).filter(([, c]) => c));
+  await r.set(keys.review(round), remarks, { ex: SUB_TTL * 5 });
 
   const entry: MuseumEntry = {
     round,

@@ -285,3 +285,55 @@ canvas.locked{cursor:not-allowed}
   *,*::before,*::after{animation:none!important;transition:none!important}
   .rv.pre{transform:none;opacity:1}
 }
+
+/* ---------- the critic ---------- */
+.critic{position:absolute;left:0;top:0;width:96px;height:150px;transition-property:transform;transition-timing-function:linear;z-index:5;pointer-events:none}
+.critic-fixed{position:fixed;top:auto;bottom:0;z-index:40}
+.critic-hit{all:unset;cursor:pointer;display:block;pointer-events:auto}
+.critic-svg{display:block;overflow:visible}
+.critic-svg .leg{transform-box:fill-box;transform-origin:50% 0}
+.critic-svg.walking .leg-f{animation:stride .5s ease-in-out infinite alternate}
+.critic-svg.walking .leg-b{animation:stride .5s ease-in-out infinite alternate-reverse}
+.critic-svg.walking{animation:bob .25s ease-in-out infinite alternate}
+.critic-svg .arm-f{transform-box:view-box;transform-origin:66px 80px;animation:peer 2.6s ease-in-out infinite}
+.critic-svg.walking .arm-f{animation:none;transform:rotate(38deg)}
+.critic-svg .stache{transform-box:fill-box;transform-origin:50% 50%}
+.critic-svg.talking .stache{animation:yap .18s ease-in-out infinite alternate}
+.critic-svg .eye{animation:blinkeye 4s infinite;transform-box:fill-box;transform-origin:50% 50%}
+@keyframes stride{from{transform:rotate(-20deg)}to{transform:rotate(20deg)}}
+@keyframes bob{to{transform:translateY(-3px)}}
+@keyframes peer{0%,100%{transform:rotate(0)}50%{transform:rotate(-8deg)}}
+@keyframes yap{to{transform:translateY(1.5px) scaleX(1.06)}}
+@keyframes blinkeye{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.critic-svg[style*="scaleX(-1)"].walking{animation:bobflip .25s ease-in-out infinite alternate}
+@keyframes bobflip{from{transform:scaleX(-1)}to{transform:scaleX(-1) translateY(-3px)}}
+.bubble{position:absolute;bottom:calc(100% - 6px);width:max-content;max-width:250px;background:#fff;border:1px solid var(--ink);padding:9px 12px;font-size:13.5px;line-height:1.35;font-weight:500;color:var(--ink);box-shadow:4px 4px 0 var(--blue);animation:pop .25s var(--ease) both}
+.bubble::after{content:"";position:absolute;top:100%;width:12px;height:12px;background:#fff;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);transform:translateY(-6px) rotate(45deg)}
+.bubble-center{left:50%;translate:-50% 0}.bubble-center::after{left:calc(50% - 6px)}
+.bubble-left{left:0}.bubble-left::after{left:30px}
+.bubble-right{right:0}.bubble-right::after{right:30px}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.96)}}
+
+.review{padding-block:40px 8px}
+.review-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.review-head h3{margin:10px 0 0;font-size:clamp(28px,3.4vw,44px);font-weight:800;font-stretch:72%;text-transform:uppercase;line-height:.95;letter-spacing:-.01em}
+.review-head h3 span{display:block;font-family:var(--mono);font-size:12px;font-weight:400;letter-spacing:.06em;color:var(--muted);margin-top:8px;font-stretch:100%}
+.review .eyebrow .live-dot{margin-right:2px}
+.review .eyebrow::before{display:none}
+.review-stage{position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:28px 22px;padding:40px 22px 34px;border:1px solid var(--ink);background:var(--panel);
+  background-image:linear-gradient(transparent calc(100% - 26px),rgba(14,14,16,.04) calc(100% - 26px))}
+.review-card{margin:0;min-width:0;position:relative;background:var(--ink);padding:7px;box-shadow:0 18px 30px -18px rgba(0,0,0,.5);transition:transform .4s var(--ease),box-shadow .4s}
+.review-card img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff}
+.review-card figcaption{background:#fff;border-top:1px solid var(--ink);padding:6px 8px;display:flex;flex-direction:column;min-width:0}
+.review-card figcaption b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.review-card figcaption span{font-family:var(--mono);font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.review-card.inspecting{transform:translateY(-4px);box-shadow:0 0 0 3px var(--blue),0 22px 34px -18px rgba(0,0,0,.55)}
+.review-card.won{box-shadow:0 0 0 4px var(--blue),0 0 0 9px rgba(31,43,255,.15),0 22px 34px -18px rgba(0,0,0,.55)}
+.review-card .badge{position:absolute;top:-12px;left:50%;translate:-50% 0;z-index:2;background:var(--blue);color:#fff;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:5px 9px;white-space:nowrap;animation:pop .4s var(--ease) both}
+.card .remark{font-size:12.5px;font-style:italic;color:var(--muted);margin-top:6px;line-height:1.35}
+
+@media (max-width:620px){
+  .critic-fixed{scale:.72;transform-origin:left bottom}
+  .review-stage{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px;padding:34px 12px 28px}
+  .bubble{max-width:190px;font-size:12.5px}
+}

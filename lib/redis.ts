@@ -20,6 +20,8 @@ export const keys = {
   ipCount: (r: number, ip: string) => `round:${r}:ip:${ip}`,
   final: (r: number) => `round:${r}:final`,
   finalLock: (r: number) => `round:${r}:final:lock`,
+  /** The critic's per-piece remarks for a judged round (Record<submissionId, remark>). */
+  review: (r: number) => `round:${r}:review`,
   sub: (id: string) => `sub:${id}`,
   subImg: (id: string) => `sub:${id}:img`,
   museum: "museum",
