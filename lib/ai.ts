@@ -1,27 +1,61 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { getVercelOidcToken } from "@vercel/oidc";
 
+/**
+ * Two backends for the Curator:
+ *  - ANTHROPIC_API_KEY set → Anthropic API directly (default model claude-haiku-5-5)
+ *  - otherwise → Vercel AI Gateway (default model anthropic/claude-sonnet-5.5)
+ * CURATOR_MODEL overrides the model for whichever backend is active.
+ */
+const DIRECT = !!process.env.ANTHROPIC_API_KEY;
+const MODEL = process.env.CURATOR_MODEL ?? (DIRECT ? "claude-haiku-5-5" : "anthropic/claude-sonnet-5.5");
 const GATEWAY = "https://ai-gateway.vercel.sh/v1/chat/completions";
-const MODEL = process.env.CURATOR_MODEL ?? "anthropic/claude-sonnet-5.5";
 
-type Part = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
-type Message = { role: "system" | "user"; content: string | Part[] };
+/** Images are JPEG data URLs (`data:image/jpeg;base64,...`). */
+type Part = { type: "text"; text: string } | { type: "image"; dataUrl: string };
 
-async function authToken(): Promise<string> {
-  if (process.env.AI_GATEWAY_API_KEY) return process.env.AI_GATEWAY_API_KEY;
-  return getVercelOidcToken();
+let anthropic: Anthropic | null = null;
+
+async function chatAnthropic(system: string, parts: Part[], maxTokens: number, timeoutMs: number): Promise<string> {
+  anthropic ??= new Anthropic();
+  const response = await anthropic.messages.create(
+    {
+      model: MODEL,
+      max_tokens: maxTokens,
+      system,
+      output_config: { effort: "low" },
+      messages: [
+        {
+          role: "user",
+          content: parts.map((p): Anthropic.ContentBlockParam =>
+            p.type === "text"
+              ? { type: "text", text: p.text }
+              : { type: "image", source: { type: "base64", media_type: "image/jpeg", data: p.dataUrl.slice(p.dataUrl.indexOf(",") + 1) } },
+          ),
+        },
+      ],
+    },
+    { timeout: timeoutMs },
+  );
+  if (response.stop_reason === "refusal") throw new Error("Curator declined the request");
+  return response.content.map((b) => (b.type === "text" ? b.text : "")).join("");
 }
 
-async function chat(messages: Message[], maxTokens: number, timeoutMs: number): Promise<string> {
+async function chatGateway(system: string, parts: Part[], maxTokens: number, timeoutMs: number): Promise<string> {
+  const token = process.env.AI_GATEWAY_API_KEY ?? (await getVercelOidcToken());
+  const content = parts.map((p) => (p.type === "text" ? p : { type: "image_url", image_url: { url: p.dataUrl } }));
   const res = await fetch(GATEWAY, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${await authToken()}` },
-    body: JSON.stringify({ model: MODEL, messages, max_tokens: maxTokens, temperature: 1 }),
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages: [{ role: "system", content: system }, { role: "user", content }] }),
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`AI gateway ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? "";
 }
+
+const chat = DIRECT ? chatAnthropic : chatGateway;
 
 function parseJson<T>(text: string): T {
   const match = text.match(/\{[\s\S]*\}/);
@@ -33,19 +67,19 @@ const CURATOR = `You are THE CURATOR, the eccentric AI director of the Agent Mus
 
 export async function generatePrompt(recent: string[]): Promise<string> {
   const text = await chat(
+    CURATOR,
     [
-      { role: "system", content: CURATOR },
       {
-        role: "user",
-        content: `Commission the next piece for the museum. Humans get 5 minutes and a simple brush/fill/eraser canvas, so it must be drawable fast but leave room for creativity and humor. Vary wildly between subjects, moods and styles (portraits, absurd scenarios, landscapes, abstract feelings, mythical creatures, self-portraits of you, etc).
+        type: "text",
+        text: `Commission the next piece for the museum. Humans get 5 minutes and a simple brush/fill/eraser canvas, so it must be drawable fast but leave room for creativity and humor. Vary wildly between subjects, moods and styles (portraits, absurd scenarios, landscapes, abstract feelings, mythical creatures, self-portraits of you, etc).
 Recently commissioned (do NOT repeat these themes):
 ${recent.map((p) => `- ${p}`).join("\n") || "- (none yet)"}
 
 Reply ONLY with JSON: {"prompt": "<the commission, max 14 words, no quotes>"}`,
       },
     ],
-    200,
-    15000,
+    4000,
+    30000,
   );
   const prompt = parseJson<{ prompt: string }>(text).prompt?.trim();
   if (!prompt) throw new Error("Empty prompt");
@@ -65,13 +99,13 @@ Judge on: how well it answers the commission, creativity, effort, humor and char
   ];
   images.forEach((img, i) => {
     parts.push({ type: "text", text: `Drawing #${i + 1}:` });
-    parts.push({ type: "image_url", image_url: { url: img } });
+    parts.push({ type: "image", dataUrl: img });
   });
   parts.push({
     type: "text",
     text: `Reply ONLY with JSON: {"winner": <number 1-${images.length}>, "title": "<a gallery placard title for the winning piece, max 6 words>", "critique": "<your curator's note on why it won, 1-2 vivid sentences>"}`,
   });
-  const text = await chat([{ role: "system", content: CURATOR }, { role: "user", content: parts }], 400, 90000);
+  const text = await chat(CURATOR, parts, 8000, 120000);
   const v = parseJson<{ winner: number; title: string; critique: string }>(text);
   const index = Math.min(Math.max(Math.round(Number(v.winner)) - 1, 0), images.length - 1);
   return { index, title: String(v.title ?? "Untitled").slice(0, 80), critique: String(v.critique ?? "").slice(0, 400) };
