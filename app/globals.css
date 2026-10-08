@@ -1,18 +1,23 @@
-/* Layout: white-cube gallery. Hairline grid, square corners, wall-label typography. Condensed display type, a single deep blue accent. Single light look. */
+/* Theme: dressed like the Critic. Cream shirt walls, tweed-brown accent, ink-black beret & mustache, gold monocle, blue bow tie. */
 :root{
-  --wall:#f4f4f2;
-  --panel:#ffffff;
-  --ink:#0e0e10;
-  --fg:#0e0e10;
-  --muted:#5d5d63;
-  --dim:#8c8c92;
-  --rule:#d9d9d6;
-  --rule-hi:#0e0e10;
-  --blue:#1f2bff;
-  --blue-ink:#ffffff;
-  --rose:#e5332a;
-  --ok:#14a05a;
-  --paper:#ffffff;
+  --wall:#efe5d1;
+  --panel:#fbf6ea;
+  --ink:#1a130c;
+  --fg:#1a130c;
+  --muted:#6b5a47;
+  --dim:#9a8770;
+  --rule:#dccdb2;
+  --rule-hi:#1a130c;
+  --blue:#7a5c3e; /* primary accent — the tweed jacket (name kept so every rule picks it up) */
+  --blue-ink:#fbf6ea;
+  --tweed-dark:#5f4630;
+  --gold:#c9a227; /* the monocle */
+  --tie:#1f2bff; /* the bow tie — used sparingly */
+  --skin:#efc6a2;
+  --rose:#b5402b;
+  --ok:#3f7d3a;
+  --paper:#fffdf7;
+  --tweed:repeating-linear-gradient(45deg,rgba(0,0,0,.09) 0 2px,transparent 2px 5px),repeating-linear-gradient(-45deg,rgba(255,255,255,.05) 0 2px,transparent 2px 5px);
   --sans:var(--font-archivo),"Archivo",ui-sans-serif,system-ui,-apple-system,sans-serif;
   --mono:var(--font-jbmono),"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --serif:var(--font-archivo),"Archivo",ui-sans-serif,system-ui,sans-serif;
@@ -329,7 +334,7 @@ canvas.locked{cursor:not-allowed}
 .review-card figcaption b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .review-card figcaption span{font-family:var(--mono);font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .review-card.inspecting{transform:translateY(-4px);box-shadow:0 0 0 3px var(--blue),0 22px 34px -18px rgba(0,0,0,.55)}
-.review-card.won{box-shadow:0 0 0 4px var(--blue),0 0 0 9px rgba(31,43,255,.15),0 22px 34px -18px rgba(0,0,0,.55)}
+.review-card.won{box-shadow:0 0 0 4px var(--blue),0 0 0 9px rgba(201,162,39,.25),0 22px 34px -18px rgba(0,0,0,.55)}
 .review-card .badge{position:absolute;top:-12px;left:50%;translate:-50% 0;z-index:2;background:var(--blue);color:#fff;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:5px 9px;white-space:nowrap;animation:pop .4s var(--ease) both}
 .card .remark{font-size:12.5px;font-style:italic;color:var(--muted);margin-top:6px;line-height:1.35}
 
@@ -341,7 +346,7 @@ canvas.locked{cursor:not-allowed}
 
 /* ---------- "draw this" banner + hero prompt highlight ---------- */
 .prompt{font-size:clamp(30px,3.3vw,46px);font-weight:750;font-stretch:85%;line-height:1.05}
-.prompt mark{background:linear-gradient(transparent 58%,rgba(31,43,255,.22) 58%);color:inherit;padding:0 .08em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.prompt mark{background:linear-gradient(transparent 58%,rgba(201,162,39,.38) 58%);color:inherit;padding:0 .08em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .drawthis{position:sticky;top:57px;z-index:20;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0;background:var(--blue);color:#fff;border:1px solid var(--ink);border-bottom:0;overflow:hidden}
 .drawthis .dt-label{display:flex;flex-direction:column;gap:4px;padding:16px 20px;border-right:1px solid rgba(255,255,255,.3);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;white-space:nowrap}
 .drawthis .dt-label span:first-child{font-size:13px;font-weight:500;background:#fff;color:var(--blue);padding:3px 8px;align-self:flex-start}
@@ -399,3 +404,50 @@ canvas.locked{cursor:not-allowed}
   .fee-notes{grid-template-columns:1fr}
   .fee-notes>div+div{border-left:0;border-top:1px solid var(--rule)}
 }
+
+
+/* ---------- Critic theme overrides ---------- */
+.ticker{background:var(--ink)}
+.ticker span::before{color:var(--gold);filter:none}
+.mark{background:var(--blue)}
+.curator{background:var(--blue)}
+.curator::after{border-color:var(--gold)}
+.timebar i,.drawthis .dt-bar{background:var(--gold)}
+.drawthis,.flow-step.hot,.step:hover{background-color:var(--blue);background-image:var(--tweed)}
+.drawthis .dt-label span:first-child{background:var(--panel);color:var(--tweed-dark)}
+.drawthis.urgent{background-color:var(--rose)}
+.drawthis.urgent .dt-label span:first-child{color:var(--rose)}
+.btn-solid{background:var(--blue);border-color:var(--tweed-dark)}
+.navlinks a.on{box-shadow:inset 0 -2px 0 var(--gold)}
+.wallet .ph{background:var(--blue)}
+.frame{background:linear-gradient(135deg,#8a6a2f,#e2c26a 28%,#9b7633 52%,#d4b05a 78%,#7a5a22);box-shadow:inset 0 0 0 2px rgba(26,19,12,.4),0 30px 60px -30px rgba(26,19,12,.55)}
+.mat{background:var(--paper)}
+.review-card{background:linear-gradient(135deg,#8a6a2f,#d4b05a 40%,#7a5a22)}
+.review-card.inspecting{box-shadow:0 0 0 3px var(--gold),0 22px 34px -18px rgba(26,19,12,.55)}
+.review-card.won,.card.win{box-shadow:0 0 0 4px var(--gold),0 0 0 9px rgba(201,162,39,.25),0 22px 34px -18px rgba(26,19,12,.45)}
+.card.win{box-shadow:inset 0 0 0 4px var(--gold)}
+.card .badge,.review-card .badge{background:var(--gold);color:var(--ink)}
+.card .mine{background:var(--tie)}
+.bubble{background:var(--paper);box-shadow:4px 4px 0 var(--tie)}
+.bubble::after{background:var(--paper)}
+.status.open{background:var(--blue);border-color:var(--tweed-dark)}
+.flow-arrow span{background:var(--gold);color:var(--ink)}
+.submitted{background:#eef4e6}
+input[type=text]{background:#f6eedd}
+input[type=text]:focus{background:var(--paper)}
+.size input::-webkit-slider-thumb{background:var(--gold)}
+.size input::-moz-range-thumb{background:var(--gold)}
+.sw[aria-pressed="true"]::after{background:var(--gold);box-shadow:0 -2px 0 var(--panel)}
+.prompt .caret{background:var(--gold)}
+.eyebrow{color:var(--tweed-dark)}
+.eyebrow::before{background:var(--gold)}
+h1 em,h2 em{color:var(--blue)}
+
+/* critic galleries */
+.gallery-stage{position:relative;padding-top:24px}
+.live-entries .gallery-stage .entries{margin-top:0}
+.gallery-empty{min-height:320px;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:24px 24px 24px 150px;border:1px dashed var(--dim);background:repeating-linear-gradient(-45deg,transparent 0 14px,rgba(26,19,12,.035) 14px 15px)}
+.gallery-empty b{font-size:clamp(22px,2.4vw,30px);font-weight:800;font-stretch:72%;text-transform:uppercase;line-height:1}
+.gallery-empty span{color:var(--muted);font-size:14.5px}
+.live-entries .eyebrow .live-dot{margin-right:2px}
+.live-entries .eyebrow::before{display:none}

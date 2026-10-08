@@ -95,7 +95,8 @@ async function judgeBatch(prompt: string, images: string[], final: boolean): Pro
       type: "text",
       text: `Your commission was: "${prompt}".
 ${images.length} humans submitted drawings. They are numbered 1..${images.length} in order below. ${final ? "Pick ONE favorite to hang in the museum forever. Its artist gets paid." : "Pick the strongest one to advance to the final round."}
-Judge on: how well it answers the commission, creativity, effort, humor and charm. Ignore blank, offensive or spam entries.
+Judge on: how well it answers the commission, creativity, effort, humor and charm. Blank or spam entries rank lowest.
+There is ALWAYS exactly one winner, even if every entry is weak: the winner is hung and paid automatically, so never say no piece wins or that no prize is awarded.
 You are also performing live as a snooty, mustachioed art critic strolling past each piece: give every drawing a one-line spoken remark (max 14 words, theatrical and funny, specific to what you see, never cruel).`,
     },
   ];
@@ -131,6 +132,23 @@ export async function judge(prompt: string, images: string[]): Promise<Verdict> 
   );
   const v = await judgeBatch(prompt, semis.map((i) => images[i]), true);
   return { ...v, index: semis[v.index], comments };
+}
+
+/** The critic's instant one-liner on a single fresh submission, shown live while the round is still running. */
+export async function quickRemark(prompt: string, dataUrl: string): Promise<string> {
+  const text = await chat(
+    CURATOR,
+    [
+      {
+        type: "text",
+        text: `You are performing live as a snooty, mustachioed art critic strolling the studio mid-competition. The commission is: "${prompt}". An artist just submitted the drawing below. Give ONE spoken remark on it: max 14 words, theatrical and funny, specific to what you see, never cruel. Reply with only the remark, no quotes.`,
+      },
+      { type: "image", dataUrl },
+    ],
+    2000,
+    30000,
+  );
+  return text.trim().replace(/^["“”']+|["“”']+$/g, "").slice(0, 160);
 }
 
 export const FALLBACK_PROMPTS = [

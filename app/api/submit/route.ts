@@ -1,4 +1,6 @@
 import { headers } from "next/headers";
+import { after } from "next/server";
+import { quickRemark } from "@/lib/ai";
 import { keys, redis } from "@/lib/redis";
 import { GRACE_MS, Submission, roundAt, roundEnd } from "@/lib/rounds";
 import { isValidWallet } from "@/lib/solana";
@@ -8,6 +10,8 @@ const PREFIX = "data:image/jpeg;base64,";
 const MAX_IMAGE_CHARS = 700_000;
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
+
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const now = Date.now();
@@ -51,6 +55,20 @@ export async function POST(req: Request) {
   await r.rpush(keys.subs(round), sub.id);
   await r.expire(keys.subs(round), TTL);
   await r.zadd(keys.activeRounds, { score: round, member: String(round) });
+
+  // The critic glances at the new piece right away so he can heckle it live on the home page.
+  after(async () => {
+    try {
+      const prompt = (await r.get<string>(keys.prompt(round))) ?? "anything at all";
+      const remark = await quickRemark(prompt, image);
+      if (remark) {
+        await r.hset(keys.liveRemarks(round), { [sub.id]: remark });
+        await r.expire(keys.liveRemarks(round), TTL);
+      }
+    } catch (e) {
+      console.error("live remark failed:", e);
+    }
+  });
 
   return Response.json({ ok: true, id: sub.id });
 }

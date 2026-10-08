@@ -22,6 +22,8 @@ export const keys = {
   finalLock: (r: number) => `round:${r}:final:lock`,
   /** The critic's per-piece remarks for a judged round (Record<submissionId, remark>). */
   review: (r: number) => `round:${r}:review`,
+  /** Instant per-submission remarks made while the round is live (hash: submissionId → remark). */
+  liveRemarks: (r: number) => `round:${r}:live-remarks`,
   sub: (id: string) => `sub:${id}`,
   subImg: (id: string) => `sub:${id}:img`,
   museum: "museum",

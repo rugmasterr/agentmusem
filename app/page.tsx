@@ -3,12 +3,18 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useReveal, useShell } from "@/components/AppShell";
-import { Review, ReviewStage } from "@/components/Critic";
+import { GalleryCritic, Review, ReviewStage } from "@/components/Critic";
 import DrawingCanvas, { CanvasHandle } from "@/components/DrawingCanvas";
 import { ArtFrame, Placard, shortAddr } from "@/components/Placard";
 import type { MuseumEntry, Submission } from "@/lib/rounds";
 
-type LiveEntries = { round: { id: number; status: string; winnerId: string | null } | null; entries?: Submission[]; total?: number; current: number };
+type LiveEntries = {
+  round: { id: number; status: string; winnerId: string | null } | null;
+  entries?: Submission[];
+  remarks?: Record<string, string>;
+  total?: number;
+  current: number;
+};
 const LIVE_LIMIT = 8;
 
 type State = {
@@ -123,11 +129,14 @@ export default function Studio() {
     };
   }, [poll]);
 
+  // On the home page the critic lives in the live-entries gallery (or on the review stage), never wandering.
   const onStage = !!state?.review?.entries.length;
   useEffect(() => {
-    setCriticBusy(onStage);
+    setCriticBusy(true);
     return () => setCriticBusy(false);
-  }, [onStage, setCriticBusy]);
+  }, [setCriticBusy]);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const galleryCards = useRef<(HTMLElement | null)[]>([]);
 
   const typed = useTyped(state?.round.prompt ?? null);
   const serverNow = now + offset;
@@ -363,33 +372,57 @@ export default function Studio() {
             </form>
           </div>
 
-          {live?.round && live.round.id === currentRound && live.entries && live.entries.length > 0 && (
-            <div className="live-entries">
-              <div className="le-head">
-                <div>
-                  <div className="eyebrow">Live entries · round #{live.round.id}</div>
-                  <h3>What everyone&apos;s drawing</h3>
-                </div>
-                <Link className="btn btn-glass" href="/submissions">
-                  See all {live.total ?? live.entries.length} →
-                </Link>
-              </div>
-              <div className="entries">
-                {live.entries.map((e) => (
-                  <Link href="/submissions" className={`card${e.id === live.round?.winnerId ? " win" : ""}`} key={e.id}>
-                    {e.id === live.round?.winnerId && <span className="badge">Curator&apos;s pick</span>}
-                    {(e.wallet === addr || e.wallet === pubkey) && <span className="mine">You</span>}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/api/sub-art/${e.id}`} alt={e.title || "Untitled"} loading="lazy" />
-                    <div className="meta">
-                      <span className="t">{e.title || "Untitled"}</span>
-                      <span className="a">{e.artist}</span>
+          {(() => {
+            const current = live?.round && live.round.id === currentRound ? live : null;
+            const entries = current?.entries ?? [];
+            return (
+              <div className="live-entries">
+                <div className="le-head">
+                  <div>
+                    <div className="eyebrow">
+                      <span className="live-dot" /> Live entries · round #{currentRound ?? "—"}
                     </div>
+                    <h3>What everyone&apos;s drawing</h3>
+                  </div>
+                  <Link className="btn btn-glass" href="/submissions">
+                    See all{current?.total ? ` ${current.total}` : ""} →
                   </Link>
-                ))}
+                </div>
+                <div className="gallery-stage" ref={galleryRef}>
+                  {entries.length ? (
+                    <div className="entries">
+                      {entries.map((e, i) => (
+                        <Link
+                          href="/submissions"
+                          className="card"
+                          key={e.id}
+                          ref={(el) => {
+                            galleryCards.current[i] = el;
+                          }}
+                        >
+                          {(e.wallet === addr || e.wallet === pubkey) && <span className="mine">You</span>}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={`/api/sub-art/${e.id}`} alt={e.title || "Untitled"} loading="lazy" />
+                          <div className="meta">
+                            <span className="t">{e.title || "Untitled"}</span>
+                            <span className="a">{e.artist}</span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="gallery-empty">
+                      <b>No entries yet this round.</b>
+                      <span>Submit yours and the critic will be over in a flash.</span>
+                    </div>
+                  )}
+                  {!onStage && (
+                    <GalleryCritic stageRef={galleryRef} cardRefs={galleryCards} ids={entries.map((e) => e.id)} remarks={current?.remarks ?? {}} />
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </section>
 
         <section id="museum">

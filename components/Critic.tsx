@@ -169,66 +169,35 @@ export function WanderingCritic() {
   );
 }
 
-export type Review = {
-  round: number;
-  total: number;
-  entries: { id: string; artist: string; title: string }[];
-  remarks: Record<string, string>;
-  winnerId: string | null;
-  winnerTitle: string | null;
-  critique: string | null;
-};
-
 /**
- * The live review: the critic walks from piece to piece in step with the AI's judging.
- * While the AI deliberates he muses; once its verdict lands he delivers its per-piece remarks and ends at the winner.
+ * Walks the critic to card `target` inside `stageRef` (cards from `cardRefs`). With no card (target < 0) he waits
+ * at the stage's bottom-left. `arrived` flips true once he's there, which is when he should speak.
  */
-export function ReviewStage({ review }: { review: Review }) {
-  const stageRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLElement | null)[]>([]);
+function useCriticWalk(
+  stageRef: React.RefObject<HTMLElement | null>,
+  cardRefs: React.RefObject<(HTMLElement | null)[]>,
+  target: number,
+  layoutKey: unknown,
+) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dur, setDur] = useState(0);
   const [walking, setWalking] = useState(false);
   const [facing, setFacing] = useState<"left" | "right">("right");
-  const [stop, setStop] = useState(0);
   const [arrived, setArrived] = useState(false);
   const posRef = useRef<{ x: number; y: number } | null>(null);
 
-  const ready = Object.keys(review.remarks).length > 0 || !!review.winnerId;
-  const winnerIdx = review.entries.findIndex((e) => e.id === review.winnerId);
-
-  // The tour: musing loops over every piece; the verdict tour visits remarked pieces then ends on the winner.
-  const tour = useMemo(() => {
-    const all = review.entries.map((_, i) => i);
-    if (!ready) return all;
-    const remarked = all.filter((i) => i !== winnerIdx && review.remarks[review.entries[i].id]).slice(0, 8);
-    return winnerIdx >= 0 ? [...remarked, winnerIdx] : remarked.length ? remarked : all;
-  }, [ready, review.entries, review.remarks, winnerIdx]);
-
-  useEffect(() => setStop(0), [ready, winnerIdx]);
-
-  const target = tour[Math.min(stop, tour.length - 1)] ?? 0;
-  const atWinner = ready && target === winnerIdx && stop >= tour.length - 1;
-  const entry = review.entries[target];
-  const line = !arrived
-    ? null
-    : !ready
-      ? THINKING[stop % THINKING.length]
-      : atWinner
-        ? review.critique || "Magnificent. Hang it in the museum!"
-        : (entry && review.remarks[entry.id]) || THINKING[stop % THINKING.length];
-
-  // Walk to the current piece.
   useLayoutEffect(() => {
     const move = () => {
-      const card = cardRefs.current[target];
       const stage = stageRef.current;
-      if (!card || !stage) return;
-      const x = Math.min(Math.max(card.offsetLeft + card.offsetWidth * 0.5 - CRITIC_W * 0.85, 0), stage.clientWidth - CRITIC_W);
-      const y = card.offsetTop + card.offsetHeight - CRITIC_H + 18;
+      if (!stage) return;
+      const card = target >= 0 ? cardRefs.current[target] : null;
+      const x = card
+        ? Math.min(Math.max(card.offsetLeft + card.offsetWidth * 0.5 - CRITIC_W * 0.85, 0), stage.clientWidth - CRITIC_W)
+        : 16;
+      const y = card ? card.offsetTop + card.offsetHeight - CRITIC_H + 18 : stage.clientHeight - CRITIC_H - 6;
       const prev = posRef.current;
       const d = prev ? Math.hypot(x - prev.x, y - prev.y) : 0;
-      const ms = prev && !reduced() ? Math.min(Math.max((d / SPEED) * 1000, 500), 2600) : 0;
+      const ms = prev && !reduced() ? Math.min(Math.max((d / SPEED) * 1000, d < 4 ? 0 : 500), 2600) : 0;
       if (prev && Math.abs(x - prev.x) > 4) setFacing(x < prev.x ? "left" : "right");
       posRef.current = { x, y };
       setDur(ms);
@@ -256,7 +225,136 @@ export function ReviewStage({ review }: { review: Review }) {
       clearTimeout(t);
       ro.disconnect();
     };
-  }, [target, review.entries.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, layoutKey]);
+
+  return { pos, dur, walking, facing, arrived };
+}
+
+/** The critic positioned inside a stage, with his speech bubble kept on-screen. */
+function StagedCritic({ walk, line, stageW }: { walk: ReturnType<typeof useCriticWalk>; line: string | null; stageW: number }) {
+  const align = walk.pos.x < 120 ? "left" : walk.pos.x > stageW - 220 ? "right" : "center";
+  return (
+    <div className="critic critic-stage" style={{ transform: `translate(${walk.pos.x}px, ${walk.pos.y}px)`, transitionDuration: `${walk.dur}ms` }}>
+      {line && <Bubble text={line} align={align} />}
+      <CriticFigure walking={walk.walking} talking={!!line} facing={walk.facing} />
+    </div>
+  );
+}
+
+const FRESH = ["Ooh, a fresh one! Let me see…", "Still wet! Stand back…", "A new arrival. *adjusts monocle*"];
+const WAITING = [
+  "No entries yet. I await genius.",
+  "The walls are bare. As is my patience.",
+  "Someone, anyone, draw something!",
+  "I've been standing here for minutes. My mustache wilts.",
+];
+
+/**
+ * The critic patrolling a grid of entries: he heads straight to any piece he hasn't seen yet, then keeps
+ * circling the rest, delivering each piece's remark (or musing while one is being written).
+ */
+export function GalleryCritic({
+  stageRef,
+  cardRefs,
+  ids,
+  remarks,
+}: {
+  stageRef: React.RefObject<HTMLElement | null>;
+  cardRefs: React.RefObject<(HTMLElement | null)[]>;
+  ids: string[];
+  remarks: Record<string, string>;
+}) {
+  const seen = useRef(new Set<string>());
+  const [current, setCurrent] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+  const target = current ? ids.indexOf(current) : -1;
+  const walk = useCriticWalk(stageRef, cardRefs, target, ids.join(","));
+
+  // Pick the next piece: unseen first (newest are first in `ids`), otherwise the next one round the circuit.
+  useEffect(() => {
+    if (!ids.length) return setCurrent(null);
+    if (current && ids.includes(current) && tick === 0) return;
+    const unseen = ids.find((id) => !seen.current.has(id));
+    const next = unseen ?? ids[(ids.indexOf(current ?? "") + 1) % ids.length];
+    seen.current.add(next);
+    setCurrent(next);
+    setTick(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids.join(","), tick]);
+
+  const fresh = current !== null && !remarks[current];
+  const line = !walk.arrived
+    ? null
+    : !ids.length
+      ? WAITING[Math.floor(Date.now() / 9000) % WAITING.length]
+      : current
+        ? remarks[current] || FRESH[ids.indexOf(current) % FRESH.length]
+        : null;
+
+  // Linger to read, then move on. Lingers longer on a piece whose remark is still being written.
+  useEffect(() => {
+    if (!walk.arrived || !ids.length) return;
+    const read = fresh ? 7000 : Math.min(2600 + (line?.length ?? 0) * 45, 7000);
+    const t = setTimeout(() => setTick((n) => n + 1), read);
+    return () => clearTimeout(t);
+  }, [walk.arrived, line, fresh, ids.length]);
+
+  // While waiting on an empty room, rotate his complaints.
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (ids.length) return;
+    const t = setInterval(() => force((n) => n + 1), 9000);
+    return () => clearInterval(t);
+  }, [ids.length]);
+
+  return <StagedCritic walk={walk} line={line} stageW={stageRef.current?.clientWidth ?? 0} />;
+}
+
+export type Review = {
+  round: number;
+  total: number;
+  entries: { id: string; artist: string; title: string }[];
+  remarks: Record<string, string>;
+  winnerId: string | null;
+  winnerTitle: string | null;
+  critique: string | null;
+};
+
+/**
+ * The live review: the critic walks from piece to piece in step with the AI's judging.
+ * While the AI deliberates he muses; once its verdict lands he delivers its per-piece remarks and ends at the winner.
+ */
+export function ReviewStage({ review }: { review: Review }) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLElement | null)[]>([]);
+  const [stop, setStop] = useState(0);
+
+  const ready = Object.keys(review.remarks).length > 0 || !!review.winnerId;
+  const winnerIdx = review.entries.findIndex((e) => e.id === review.winnerId);
+
+  // The tour: musing loops over every piece; the verdict tour visits remarked pieces then ends on the winner.
+  const tour = useMemo(() => {
+    const all = review.entries.map((_, i) => i);
+    if (!ready) return all;
+    const remarked = all.filter((i) => i !== winnerIdx && review.remarks[review.entries[i].id]).slice(0, 8);
+    return winnerIdx >= 0 ? [...remarked, winnerIdx] : remarked.length ? remarked : all;
+  }, [ready, review.entries, review.remarks, winnerIdx]);
+
+  useEffect(() => setStop(0), [ready, winnerIdx]);
+
+  const target = tour[Math.min(stop, tour.length - 1)] ?? 0;
+  const walk = useCriticWalk(stageRef, cardRefs, target, review.entries.length);
+  const arrived = walk.arrived;
+  const atWinner = ready && target === winnerIdx && stop >= tour.length - 1;
+  const entry = review.entries[target];
+  const line = !arrived
+    ? null
+    : !ready
+      ? THINKING[stop % THINKING.length]
+      : atWinner
+        ? review.critique || "Magnificent. Hang it in the museum!"
+        : (entry && review.remarks[entry.id]) || THINKING[stop % THINKING.length];
 
   // Linger long enough to read the line, then move on (musing loops forever; the verdict tour stops at the winner).
   useEffect(() => {
@@ -266,8 +364,6 @@ export function ReviewStage({ review }: { review: Review }) {
     return () => clearTimeout(t);
   }, [arrived, atWinner, line, ready, tour.length]);
 
-  const stageW = stageRef.current?.clientWidth ?? 0;
-  const align = pos.x < 120 ? "left" : pos.x > stageW - 220 ? "right" : "center";
 
   return (
     <section className="review" aria-label={`The critic reviews round ${review.round}`}>
@@ -306,10 +402,7 @@ export function ReviewStage({ review }: { review: Review }) {
             </figcaption>
           </figure>
         ))}
-        <div className="critic critic-stage" style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, transitionDuration: `${dur}ms` }}>
-          {line && <Bubble text={line} align={align} />}
-          <CriticFigure walking={walking} talking={!!line} facing={facing} />
-        </div>
+        <StagedCritic walk={walk} line={line} stageW={stageRef.current?.clientWidth ?? 0} />
       </div>
     </section>
   );

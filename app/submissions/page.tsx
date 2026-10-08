@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { shortAddr, useShell } from "@/components/AppShell";
+import { GalleryCritic } from "@/components/Critic";
 import type { Submission } from "@/lib/rounds";
 
 type RoundInfo = { id: number; prompt: string | null; status: "open" | "judging" | "done" | "empty"; winnerId: string | null; winnerTitle: string | null };
@@ -15,6 +16,8 @@ const STATUS: Record<RoundInfo["status"], string> = {
   empty: "Closed",
 };
 
+const CRITIC_TOUR = 12;
+
 const timeAgo = (t: number) => {
   const s = Math.max(0, Math.round((Date.now() - t) / 1000));
   if (s < 60) return `${s}s ago`;
@@ -24,7 +27,13 @@ const timeAgo = (t: number) => {
 };
 
 export default function Submissions() {
-  const { pubkey } = useShell();
+  const { pubkey, setCriticBusy } = useShell();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLElement | null)[]>([]);
+  useEffect(() => {
+    setCriticBusy(true);
+    return () => setCriticBusy(false);
+  }, [setCriticBusy]);
   const [selected, setSelected] = useState<number | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [zoom, setZoom] = useState<Submission | null>(null);
@@ -36,6 +45,9 @@ export default function Submissions() {
     } catch {}
   }, []);
 
+  const statusRef = useRef<string | undefined>(undefined);
+  statusRef.current = data?.round?.status;
+
   const load = useCallback(async () => {
     const res = await fetch(`/api/submissions${selected !== null ? `?round=${selected}` : ""}`, { cache: "no-store" });
     if (res.ok) setData(await res.json());
@@ -45,10 +57,11 @@ export default function Submissions() {
     load();
     // Keep live rounds fresh; finished rounds don't change once the winner is hung.
     const t = setInterval(() => {
-      if (!data?.round || data.round.status === "open" || data.round.status === "judging") load();
+      const status = statusRef.current;
+      if (!status || status === "open" || status === "judging") load();
     }, 5000);
     return () => clearInterval(t);
-  }, [load, data?.round]);
+  }, [load]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setZoom(null);
@@ -58,6 +71,7 @@ export default function Submissions() {
 
   const round = data?.round;
   const entries = data?.entries ?? [];
+  const sorted = [...entries].sort((a, b) => Number(b.id === round?.winnerId) - Number(a.id === round?.winnerId));
   const isMine = (w: string) => w === pubkey || w === mine;
 
   return (
@@ -68,7 +82,7 @@ export default function Submissions() {
           <h2>
             The <em>submissions.</em>
           </h2>
-          <p className="sub">See what everyone drew for each commission. The Curator&apos;s pick is marked in blue.</p>
+          <p className="sub">See what everyone drew for each commission. The Curator&apos;s pick is framed in gold.</p>
         </div>
         <Link className="btn btn-solid" href="/#studio">
           Enter this round
@@ -115,16 +129,22 @@ export default function Submissions() {
             </span>
           </div>
 
-          {entries.length === 0 ? (
-            <p className="sub" style={{ marginTop: 28 }}>
-              No entries for this round.
-            </p>
-          ) : (
-            <div className="entries">
-              {[...entries]
-                .sort((a, b) => Number(b.id === round.winnerId) - Number(a.id === round.winnerId))
-                .map((s) => (
-                  <div className={`card${s.id === round.winnerId ? " win" : ""}`} key={s.id}>
+          <div className="gallery-stage" ref={stageRef}>
+            {entries.length === 0 ? (
+              <div className="gallery-empty">
+                <b>No entries for this round.</b>
+                <span>The critic is pacing.</span>
+              </div>
+            ) : (
+              <div className="entries">
+                {sorted.map((s, i) => (
+                  <div
+                    className={`card${s.id === round.winnerId ? " win" : ""}`}
+                    key={s.id}
+                    ref={(el) => {
+                      cardRefs.current[i] = el;
+                    }}
+                  >
                     {s.id === round.winnerId && <span className="badge">Curator&apos;s pick</span>}
                     {isMine(s.wallet) && <span className="mine">You</span>}
                     <button className="open" type="button" onClick={() => setZoom(s)} aria-label={`View ${s.title || "Untitled"} by ${s.artist}`}>
@@ -141,8 +161,11 @@ export default function Submissions() {
                     </div>
                   </div>
                 ))}
-            </div>
-          )}
+              </div>
+            )}
+            {/* He patrols the first rows only so he stays near the top of long rounds. */}
+            <GalleryCritic stageRef={stageRef} cardRefs={cardRefs} ids={sorted.slice(0, CRITIC_TOUR).map((s) => s.id)} remarks={data?.remarks ?? {}} />
+          </div>
         </>
       )}
 

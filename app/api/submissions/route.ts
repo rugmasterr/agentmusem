@@ -17,12 +17,13 @@ export async function GET(req: Request) {
   if (round === undefined) return Response.json({ round: null, rounds, current: roundAt(Date.now()) });
 
   const [ids, total] = await Promise.all([r.lrange<string>(keys.subs(round), -limit, -1), r.llen(keys.subs(round))]);
-  const [prompt, final, winner, subs, remarks] = await Promise.all([
+  const [prompt, final, winner, subs, remarks, liveRemarks] = await Promise.all([
     r.get<string>(keys.prompt(round)),
     r.get<RoundFinal>(keys.final(round)),
     r.get<MuseumEntry>(keys.museumEntry(round)),
     ids.length ? r.mget<(Submission | null)[]>(...ids.map(keys.sub)) : Promise.resolve([]),
     r.get<Record<string, string>>(keys.review(round)),
+    r.hgetall<Record<string, string>>(keys.liveRemarks(round)),
   ]);
   const current = roundAt(Date.now());
   const status = round === current ? "open" : final?.status === "done" ? "done" : final ? "empty" : ids.length ? "judging" : "empty";
@@ -32,7 +33,8 @@ export async function GET(req: Request) {
       round: { id: round, prompt, status, winnerId: winner?.submissionId ?? null, winnerTitle: winner?.title ?? null },
       entries: subs.filter(Boolean).reverse(),
       total,
-      remarks: remarks ?? {},
+      // Verdict-time remarks win over the instant ones made during the round.
+      remarks: { ...(liveRemarks ?? {}), ...(remarks ?? {}) },
       rounds,
       current,
     },
