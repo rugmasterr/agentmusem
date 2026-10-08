@@ -27,13 +27,9 @@ const timeAgo = (t: number) => {
 };
 
 export default function Submissions() {
-  const { pubkey, setCriticBusy } = useShell();
+  const { pubkey } = useShell();
   const stageRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLElement | null)[]>([]);
-  useEffect(() => {
-    setCriticBusy(true);
-    return () => setCriticBusy(false);
-  }, [setCriticBusy]);
   const [selected, setSelected] = useState<number | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [zoom, setZoom] = useState<Submission | null>(null);

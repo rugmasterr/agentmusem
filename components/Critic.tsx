@@ -6,18 +6,16 @@ export const CRITIC_W = 96;
 export const CRITIC_H = 150;
 const SPEED = 110; // px per second
 
-const QUIPS = [
-  "Five minutes, darling. Art waits for no one.",
-  "I've seen finer brushwork on a napkin. Prove me wrong.",
-  "The Curator is watching. As am I.",
-  "Bold strokes! Or none at all.",
-  "Ah, the aroma of fresh pixels.",
-  "Is that a masterpiece forming? Hm. We shall see.",
-  "In my day we drew with a mouse AND a soul.",
-  "The pot goes to genius. Or whoever bothers to try.",
-  "Do not touch the art. Unless it is yours.",
-  "*twirls mustache thoughtfully*",
-];
+const MUSEUM_LINES = [
+  "Welcome to the permanent collection. Do not touch.",
+  "Every piece here was paid for. My opinions, sadly, are free.",
+  "Ah, the classics. Some of them are minutes old.",
+  "I have reviewed every one of these. Most of them twice.",
+  "Hush. Art is happening.",
+  "Note the brushwork. Or the bold absence of it.",
+  "Each of these artists got paid. Inspiring, really.",
+  "Take your time. The art isn't going anywhere.",
+]
 
 const THINKING = [
   "Hmm… hmmm.",
@@ -113,61 +111,28 @@ function Bubble({ text, align }: { text: string; align: "left" | "center" | "rig
 
 const reduced = () => typeof window !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Strolls along the bottom of the viewport between rounds, dropping the occasional quip. Click him for more. */
-export function WanderingCritic() {
-  const [x, setX] = useState(-200);
-  const [dur, setDur] = useState(0);
-  const [walking, setWalking] = useState(false);
-  const [facing, setFacing] = useState<"left" | "right">("right");
-  const [line, setLine] = useState<string | null>(null);
-  const quipIdx = useRef(0);
-  const xRef = useRef(-200);
-
-  const say = (text: string, ms = 4200) => {
-    setLine(text);
-    setTimeout(() => setLine((l) => (l === text ? null : l)), ms);
-  };
-  const quip = () => say(QUIPS[quipIdx.current++ % QUIPS.length]);
-
+/** Stands in one spot (e.g. the museum entrance) and calmly cycles through a few lines. */
+export function StandingCritic({ lines = MUSEUM_LINES, every = 7000 }: { lines?: string[]; every?: number }) {
+  const [i, setI] = useState(0);
+  const [talking, setTalking] = useState(true);
   useEffect(() => {
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const step = () => {
-      if (!alive) return;
-      const max = Math.max(innerWidth - CRITIC_W - 16, 16);
-      const target = reduced() ? max : 16 + Math.random() * (max - 16);
-      const d = Math.abs(target - xRef.current);
-      const ms = reduced() ? 0 : Math.max(600, (d / SPEED) * 1000);
-      setFacing(target < xRef.current ? "left" : "right");
-      setDur(ms);
-      setX(target);
-      xRef.current = target;
-      setWalking(ms > 0);
-      timer = setTimeout(() => {
-        setWalking(false);
-        if (Math.random() < 0.45) quip();
-        timer = setTimeout(step, 3500 + Math.random() * 5000);
-      }, ms);
-    };
-    timer = setTimeout(step, 1500);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const align = x < 140 ? "left" : x > (typeof window === "undefined" ? 0 : innerWidth) - 240 ? "right" : "center";
-
+    const t = setInterval(() => setI((n) => n + 1), every);
+    return () => clearInterval(t);
+  }, [every]);
+  // Mouth moves for the first few seconds of each line, then he just stands there looking refined.
+  useEffect(() => {
+    setTalking(true);
+    const t = setTimeout(() => setTalking(false), 2500);
+    return () => clearTimeout(t);
+  }, [i]);
   return (
-    <div className="critic critic-fixed" style={{ transform: `translateX(${x}px)`, transitionDuration: `${dur}ms` }}>
-      {line && <Bubble text={line} align={align} />}
-      <button type="button" className="critic-hit" onClick={quip} aria-label="The critic">
-        <CriticFigure walking={walking} talking={!!line} facing={facing} />
-      </button>
+    <div className="critic-standing">
+      <Bubble key={i} text={lines[i % lines.length]} align="right" />
+      <CriticFigure talking={talking} facing="left" />
     </div>
   );
 }
+
 
 /**
  * Walks the critic to card `target` inside `stageRef` (cards from `cardRefs`). With no card (target < 0) he waits

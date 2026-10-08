@@ -293,9 +293,6 @@ canvas.locked{cursor:not-allowed}
 
 /* ---------- the critic ---------- */
 .critic{position:absolute;left:0;top:0;width:96px;height:150px;transition-property:transform;transition-timing-function:linear;z-index:5;pointer-events:none}
-.critic-fixed{position:fixed;top:auto;bottom:0;z-index:40}
-/* click-through so he never blocks the canvas */
-.critic-hit{all:unset;display:block;pointer-events:none}
 .critic-svg{display:block;overflow:visible}
 .critic-svg .leg{transform-box:fill-box;transform-origin:50% 0}
 .critic-svg.walking .leg-f{animation:stride .5s ease-in-out infinite alternate}
@@ -339,7 +336,6 @@ canvas.locked{cursor:not-allowed}
 .card .remark{font-size:12.5px;font-style:italic;color:var(--muted);margin-top:6px;line-height:1.35}
 
 @media (max-width:620px){
-  .critic-fixed{scale:.72;transform-origin:left bottom}
   .review-stage{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px;padding:34px 12px 28px}
   .bubble{max-width:190px;font-size:12.5px}
 }
@@ -451,3 +447,8 @@ h1 em,h2 em{color:var(--blue)}
 .gallery-empty span{color:var(--muted);font-size:14.5px}
 .live-entries .eyebrow .live-dot{margin-right:2px}
 .live-entries .eyebrow::before{display:none}
+
+/* museum host: the critic standing by the entrance */
+.museum-host{display:flex;align-items:flex-end;gap:12px}
+.critic-standing{position:relative;width:96px;height:150px;flex:none;margin-bottom:-24px}
+.critic-standing .bubble{right:30px}

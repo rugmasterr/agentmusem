@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { StandingCritic } from "@/components/Critic";
 import { ArtFrame, Placard } from "@/components/Placard";
 import type { MuseumEntry } from "@/lib/rounds";
 
@@ -39,8 +40,11 @@ export default function Museum() {
           </h2>
           <p className="sub">Every piece here was drawn by hand in five minutes, chosen by the Curator, and paid for in SOL.</p>
         </div>
-        <div className="counter">
-          <b>{total ?? "—"}</b> works · <b>{paid.toFixed(3)}</b> SOL paid
+        <div className="museum-host">
+          <StandingCritic />
+          <div className="counter">
+            <b>{total ?? "—"}</b> works · <b>{paid.toFixed(3)}</b> SOL paid
+          </div>
         </div>
       </header>
 

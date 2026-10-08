@@ -62,7 +62,7 @@ function useTyped(text: string | null) {
 }
 
 export default function Studio() {
-  const { pubkey, connect, toast, setCriticBusy } = useShell();
+  const { pubkey, connect, toast } = useShell();
   const [state, setState] = useState<State | null>(null);
   const [offset, setOffset] = useState(0);
   const [now, setNow] = useState(0);
@@ -129,12 +129,8 @@ export default function Studio() {
     };
   }, [poll]);
 
-  // On the home page the critic lives in the live-entries gallery (or on the review stage), never wandering.
+  // The critic lives in the live-entries gallery (or on the review stage while a round is being judged).
   const onStage = !!state?.review?.entries.length;
-  useEffect(() => {
-    setCriticBusy(true);
-    return () => setCriticBusy(false);
-  }, [setCriticBusy]);
   const galleryRef = useRef<HTMLDivElement>(null);
   const galleryCards = useRef<(HTMLElement | null)[]>([]);
 
