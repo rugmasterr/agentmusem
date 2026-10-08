@@ -445,8 +445,8 @@ export default function Studio() {
               ["The commission", "Every 5 minutes the Curator, an AI agent, requests a new piece."],
               ["You draw", "You have 5 minutes to draw it by hand on the canvas."],
               ["You submit", "Enter your Solana wallet. One entry per wallet per round."],
-              ["The Curator picks", "Its favourite is hung for good, and the artist gets every fee in the treasury."],
-              ["Or it rolls over", "No entries? The pot carries into the next round."],
+              ["The Curator picks", "Its favourite is hung for good, and the artist is paid 100% of the treasury, automatically."],
+              ["Or it rolls over", "No entries? The pot keeps growing into the next round."],
             ].map(([h, p], i) => (
               <div className="glass step rv" key={h}>
                 <div className="n">{i + 1}</div>
@@ -454,6 +454,67 @@ export default function Studio() {
                 <p>{p}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section id="fees">
+          <div className="rv">
+            <div className="eyebrow">Where the prize comes from</div>
+            <h2>
+              Coin fees in. <em>Artists paid out.</em>
+            </h2>
+            <p className="sub">
+              Every trade of the coin generates fees. 70% of them flow automatically into the treasury wallet, and every 5 minutes the treasury pays out
+              everything it holds to that round&apos;s winning artist.
+            </p>
+          </div>
+          <div className="flow rv">
+            <div className="flow-step">
+              <div className="n">01</div>
+              <div className="big">Trading fees</div>
+              <p>Every buy and sell of the coin generates creator fees.</p>
+            </div>
+            <div className="flow-arrow" aria-hidden="true">
+              <span>70%</span>
+            </div>
+            <div className="flow-step hot">
+              <div className="n">02</div>
+              <div className="big">Treasury wallet</div>
+              <p>
+                70% of all fees land here automatically. The split happens on-chain at the source.
+                {state?.pot.treasury && (
+                  <>
+                    {" "}
+                    <a href={`https://solscan.io/account/${state.pot.treasury}`} target="_blank" rel="noreferrer">
+                      {shortAddr(state.pot.treasury)} ↗
+                    </a>
+                  </>
+                )}
+              </p>
+              <div className="flow-pot">
+                Pot right now <b>{(state?.pot.sol ?? 0).toFixed(3)} SOL</b>
+              </div>
+            </div>
+            <div className="flow-arrow" aria-hidden="true">
+              <span>100%</span>
+            </div>
+            <div className="flow-step">
+              <div className="n">03</div>
+              <div className="big">The winner</div>
+              <p>Every 5 minutes the whole treasury is sent straight to the winning artist&apos;s wallet. No claiming, no waiting.</p>
+            </div>
+          </div>
+          <div className="fee-notes rv">
+            <div>
+              <b>100% of the treasury, every round.</b> The site never takes a cut of the treasury. The only thing held back is a tiny reserve
+              (~0.003 SOL) so the wallet can pay Solana network fees.
+            </div>
+            <div>
+              <b>No winner, no payout.</b> If nobody enters, nothing is sent and the pot rolls into the next round, so it gets bigger.
+            </div>
+            <div>
+              <b>Fully on-chain.</b> Every payout is a public Solana transaction, linked from the winner&apos;s placard in the museum.
+            </div>
           </div>
         </section>
       </main>

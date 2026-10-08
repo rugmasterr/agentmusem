@@ -37,6 +37,7 @@ const LINKS = [
   { href: "/submissions", label: "Submissions" },
   { href: "/museum", label: "Museum" },
   { href: "/#how", label: "How it works" },
+  { href: "/#fees", label: "Fees" },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
