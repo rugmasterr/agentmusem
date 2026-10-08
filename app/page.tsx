@@ -98,12 +98,14 @@ export default function Studio() {
     } catch {}
   }, [toast]);
 
+  const currentRound = state?.round.id;
   const pollLive = useCallback(async () => {
+    if (currentRound === undefined) return;
     try {
-      const res = await fetch(`/api/submissions?limit=${LIVE_LIMIT}`, { cache: "no-store" });
+      const res = await fetch(`/api/submissions?round=${currentRound}&limit=${LIVE_LIMIT}`, { cache: "no-store" });
       if (res.ok) setLive(await res.json());
     } catch {}
-  }, []);
+  }, [currentRound]);
 
   useEffect(() => {
     pollLive();
@@ -361,12 +363,12 @@ export default function Studio() {
             </form>
           </div>
 
-          {live?.round && live.entries && live.entries.length > 0 && (
+          {live?.round && live.round.id === currentRound && live.entries && live.entries.length > 0 && (
             <div className="live-entries">
               <div className="le-head">
                 <div>
-                  <div className="eyebrow">{live.round.id === live.current ? "Live entries" : `Round #${live.round.id} entries`}</div>
-                  <h3>{live.round.id === live.current ? "What everyone's drawing" : "Last round's entries"}</h3>
+                  <div className="eyebrow">Live entries · round #{live.round.id}</div>
+                  <h3>What everyone&apos;s drawing</h3>
                 </div>
                 <Link className="btn btn-glass" href="/submissions">
                   See all {live.total ?? live.entries.length} →
