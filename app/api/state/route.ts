@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { finalizePending, getEntry, getOrCreatePrompt, getPotLamports } from "@/lib/game";
 import { keys, redis } from "@/lib/redis";
 import { ROUND_MS, RoundFinal, Submission, roundAt, roundEnd, roundStart } from "@/lib/rounds";
+import { isPaused } from "@/lib/paused";
 import { lamportsToSol, treasuryAddress } from "@/lib/solana";
 
 export const maxDuration = 300;
@@ -67,6 +68,7 @@ export async function GET() {
       review,
       pastPrompts: pastPrompts.filter((p): p is string => !!p),
       pot: { sol: lamportsToSol(pot), treasury: treasuryAddress() },
+      paused: isPaused(),
     },
     { headers: { "cache-control": "no-store" } },
   );

@@ -26,6 +26,7 @@ type State = {
   review: Review | null;
   pastPrompts: string[];
   pot: { sol: number; treasury: string | null };
+  paused?: boolean;
 };
 
 const GRACE_MS = 5000;
@@ -348,8 +349,13 @@ export default function Studio() {
                 <div className="err" role="alert">
                   {err}
                 </div>
-                <button className="btn btn-solid" type="submit" disabled={busy || hasSubmitted || closed || !state?.round.prompt}>
-                  {hasSubmitted ? "Entered ✓" : closed ? "Time's up" : busy ? "Submitting…" : "Submit to the Curator"}
+                {state?.paused && (
+                  <div className="paused-note">
+                    <b>Launching soon.</b> Practice on the canvas all you like — submissions and payouts open at launch.
+                  </div>
+                )}
+                <button className="btn btn-solid" type="submit" disabled={busy || hasSubmitted || closed || !state?.round.prompt || !!state?.paused}>
+                  {state?.paused ? "Opens at launch" : hasSubmitted ? "Entered ✓" : closed ? "Time's up" : busy ? "Submitting…" : "Submit to the Curator"}
                 </button>
                 {hasSubmitted && submitted && (
                   <div className="submitted">

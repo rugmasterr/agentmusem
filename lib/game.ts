@@ -1,4 +1,5 @@
 import { FALLBACK_PROMPTS, generatePrompt, judge } from "./ai";
+import { isPaused } from "./paused";
 import { keys, redis } from "./redis";
 import { MuseumEntry, RoundFinal, Submission, roundAt } from "./rounds";
 import { MIN_PAYOUT_LAMPORTS, claimCreatorFees, potLamports, sendPayout, treasury } from "./solana";
@@ -15,6 +16,7 @@ export async function getOrCreatePrompt(round: number): Promise<string | null> {
   let prompt: string;
   try {
     const recent = await r.lrange<string>(keys.recentPrompts, 0, 19);
+    if (isPaused()) throw new Error("paused: using preset prompts");
     prompt = await generatePrompt(recent);
   } catch (e) {
     console.error("prompt generation failed, using fallback:", e);
@@ -126,6 +128,7 @@ async function payWinner(round: number, entry: MuseumEntry): Promise<MuseumEntry
 
 /** Finalizes (judge + hang + pay) any of the last few rounds that ended without being finalized. */
 export async function finalizePending(now = Date.now()): Promise<void> {
+  if (isPaused()) return; // no judging, no payouts
   const current = roundAt(now);
   const rounds = [current - 1, current - 2, current - 3];
   const finals = await redis().mget<(RoundFinal | null)[]>(...rounds.map(keys.final));

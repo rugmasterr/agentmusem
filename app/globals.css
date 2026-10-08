@@ -452,3 +452,6 @@ h1 em,h2 em{color:var(--blue)}
 .museum-host{display:flex;align-items:flex-end;gap:12px}
 .critic-standing{position:relative;width:96px;height:150px;flex:none;margin-bottom:-24px}
 .critic-standing .bubble{right:30px}
+
+.paused-note{border:1px solid var(--gold);background:rgba(201,162,39,.14);padding:10px 12px;font-size:13.5px;color:var(--muted)}
+.paused-note b{color:var(--ink)}

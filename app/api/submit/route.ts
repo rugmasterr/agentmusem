@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { quickRemark } from "@/lib/ai";
+import { isPaused } from "@/lib/paused";
 import { keys, redis } from "@/lib/redis";
 import { GRACE_MS, Submission, roundAt, roundEnd } from "@/lib/rounds";
 import { isValidWallet } from "@/lib/solana";
@@ -14,6 +15,7 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
+  if (isPaused()) return Response.json({ error: "The museum opens soon. Submissions are paused until launch." }, { status: 503 });
   const now = Date.now();
   let body: { round?: number; artist?: string; title?: string; wallet?: string; image?: string };
   try {
