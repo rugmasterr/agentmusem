@@ -289,7 +289,8 @@ canvas.locked{cursor:not-allowed}
 /* ---------- the critic ---------- */
 .critic{position:absolute;left:0;top:0;width:96px;height:150px;transition-property:transform;transition-timing-function:linear;z-index:5;pointer-events:none}
 .critic-fixed{position:fixed;top:auto;bottom:0;z-index:40}
-.critic-hit{all:unset;cursor:pointer;display:block;pointer-events:auto}
+/* click-through so he never blocks the canvas */
+.critic-hit{all:unset;display:block;pointer-events:none}
 .critic-svg{display:block;overflow:visible}
 .critic-svg .leg{transform-box:fill-box;transform-origin:50% 0}
 .critic-svg.walking .leg-f{animation:stride .5s ease-in-out infinite alternate}
@@ -336,4 +337,35 @@ canvas.locked{cursor:not-allowed}
   .critic-fixed{scale:.72;transform-origin:left bottom}
   .review-stage{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 12px;padding:34px 12px 28px}
   .bubble{max-width:190px;font-size:12.5px}
+}
+
+/* ---------- "draw this" banner + hero prompt highlight ---------- */
+.prompt{font-size:clamp(30px,3.3vw,46px);font-weight:750;font-stretch:85%;line-height:1.05}
+.prompt mark{background:linear-gradient(transparent 58%,rgba(31,43,255,.22) 58%);color:inherit;padding:0 .08em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.drawthis{position:sticky;top:57px;z-index:20;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0;background:var(--blue);color:#fff;border:1px solid var(--ink);border-bottom:0;overflow:hidden}
+.drawthis .dt-label{display:flex;flex-direction:column;gap:4px;padding:16px 20px;border-right:1px solid rgba(255,255,255,.3);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;white-space:nowrap}
+.drawthis .dt-label span:first-child{font-size:13px;font-weight:500;background:#fff;color:var(--blue);padding:3px 8px;align-self:flex-start}
+.drawthis .dt-label span:last-child{opacity:.75}
+.drawthis .dt-prompt{padding:14px 22px;font-size:clamp(24px,3.2vw,46px);font-weight:800;font-stretch:78%;text-transform:uppercase;line-height:1;letter-spacing:-.01em;text-wrap:balance;min-width:0}
+.drawthis .dt-time{display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding:14px 20px;border-left:1px solid rgba(255,255,255,.3);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
+.drawthis .dt-time b{font-size:clamp(26px,2.8vw,38px);font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.drawthis .dt-bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:#fff;transform-origin:left;transition:transform 1s linear;opacity:.9}
+.drawthis.urgent{background:var(--rose)}
+.drawthis.urgent .dt-label span:first-child{color:var(--rose)}
+.drawthis.urgent .dt-time b{animation:pulse 1s steps(2) infinite}
+.drawthis + .studio{border-top:0}
+
+/* ---------- live entries under the easel ---------- */
+.live-entries{margin-top:40px}
+.le-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.le-head h3{margin:10px 0 0;font-size:clamp(28px,3.4vw,44px);font-weight:800;font-stretch:72%;text-transform:uppercase;line-height:.95;letter-spacing:-.01em}
+.live-entries .entries{margin-top:20px}
+.live-entries .card{color:inherit;transition:background .2s}
+.live-entries .card:hover{background:var(--wall)}
+
+@media (max-width:620px){
+  .drawthis{position:relative;top:auto;grid-template-columns:1fr auto}
+  .drawthis .dt-label{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;border-right:0;border-bottom:1px solid rgba(255,255,255,.3);padding:10px 14px}
+  .drawthis .dt-prompt{padding:12px 14px;font-size:26px}
+  .drawthis .dt-time{padding:12px 14px}
 }

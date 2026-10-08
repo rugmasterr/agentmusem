@@ -6,7 +6,10 @@ import { useReveal, useShell } from "@/components/AppShell";
 import { Review, ReviewStage } from "@/components/Critic";
 import DrawingCanvas, { CanvasHandle } from "@/components/DrawingCanvas";
 import { ArtFrame, Placard, shortAddr } from "@/components/Placard";
-import type { MuseumEntry } from "@/lib/rounds";
+import type { MuseumEntry, Submission } from "@/lib/rounds";
+
+type LiveEntries = { round: { id: number; status: string; winnerId: string | null } | null; entries?: Submission[]; total?: number; current: number };
+const LIVE_LIMIT = 8;
 
 type State = {
   now: number;
@@ -63,6 +66,7 @@ export default function Studio() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState<{ round: number; img: string; title: string; artist: string } | null>(null);
+  const [live, setLive] = useState<LiveEntries | null>(null);
   const canvas = useRef<CanvasHandle>(null);
   const roundRef = useRef<number | null>(null);
   useReveal();
@@ -93,6 +97,19 @@ export default function Studio() {
       roundRef.current = s.round.id;
     } catch {}
   }, [toast]);
+
+  const pollLive = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/submissions?limit=${LIVE_LIMIT}`, { cache: "no-store" });
+      if (res.ok) setLive(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    pollLive();
+    const t = setInterval(pollLive, 6000);
+    return () => clearInterval(t);
+  }, [pollLive]);
 
   useEffect(() => {
     poll();
@@ -143,6 +160,7 @@ export default function Studio() {
       setSubmitted({ round: state.round.id, img, title: title.trim() || "Untitled", artist: name });
       toast("Entry received. Good luck!");
       poll();
+      pollLive();
     } catch (error) {
       setErr((error as Error).message);
     } finally {
@@ -212,7 +230,7 @@ export default function Studio() {
             </div>
             <div className="label">This round&apos;s commission</div>
             <div className="prompt" aria-live="polite">
-              <span>{state?.round.prompt ? typed : "The Curator is thinking…"}</span>
+              {state?.round.prompt ? <mark>{typed}</mark> : <span>The Curator is thinking…</span>}
               <span className="caret" />
             </div>
             <div className="stats">
@@ -260,6 +278,22 @@ export default function Studio() {
         {onStage && state?.review && <ReviewStage review={state.review} />}
 
         <section id="studio" style={{ paddingTop: 40 }}>
+          <div className={`drawthis${state && secs <= 30 ? " urgent" : ""}`}>
+            <div className="dt-label">
+              <span>Draw this</span>
+              <span>Round #{state?.round.id ?? "—"}</span>
+            </div>
+            <div className="dt-prompt" aria-live="polite">
+              {state?.round.prompt ? `“${state.round.prompt}”` : "The Curator is thinking…"}
+            </div>
+            <div className="dt-time">
+              <span>Time left</span>
+              <b>
+                {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}
+              </b>
+            </div>
+            <i className="dt-bar" style={{ transform: `scaleX(${state ? left / state.roundMs : 1})` }} />
+          </div>
           <div className="studio">
             <div className="glass easel rv">
               <DrawingCanvas ref={canvas} disabled={hasSubmitted || closed} />
@@ -326,6 +360,34 @@ export default function Studio() {
               </div>
             </form>
           </div>
+
+          {live?.round && live.entries && live.entries.length > 0 && (
+            <div className="live-entries">
+              <div className="le-head">
+                <div>
+                  <div className="eyebrow">{live.round.id === live.current ? "Live entries" : `Round #${live.round.id} entries`}</div>
+                  <h3>{live.round.id === live.current ? "What everyone's drawing" : "Last round's entries"}</h3>
+                </div>
+                <Link className="btn btn-glass" href="/submissions">
+                  See all {live.total ?? live.entries.length} →
+                </Link>
+              </div>
+              <div className="entries">
+                {live.entries.map((e) => (
+                  <Link href="/submissions" className={`card${e.id === live.round?.winnerId ? " win" : ""}`} key={e.id}>
+                    {e.id === live.round?.winnerId && <span className="badge">Curator&apos;s pick</span>}
+                    {(e.wallet === addr || e.wallet === pubkey) && <span className="mine">You</span>}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/sub-art/${e.id}`} alt={e.title || "Untitled"} loading="lazy" />
+                    <div className="meta">
+                      <span className="t">{e.title || "Untitled"}</span>
+                      <span className="a">{e.artist}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section id="museum">

@@ -4,7 +4,9 @@ import { MuseumEntry, RoundFinal, Submission, roundAt } from "@/lib/rounds";
 /** Lists every entry for a round (defaults to the latest round with entries), plus recent rounds for navigation. */
 export async function GET(req: Request) {
   const r = redis();
-  const param = new URL(req.url).searchParams.get("round");
+  const params = new URL(req.url).searchParams;
+  const param = params.get("round");
+  const limit = Math.min(Math.max(Number(params.get("limit")) || 1000, 1), 1000);
   const recentIds = (await r.zrange<string[]>(keys.activeRounds, 0, 29, { rev: true })).map(Number);
   const round = param !== null && Number.isInteger(Number(param)) ? Number(param) : recentIds[0];
 
@@ -14,7 +16,7 @@ export async function GET(req: Request) {
 
   if (round === undefined) return Response.json({ round: null, rounds, current: roundAt(Date.now()) });
 
-  const ids = await r.lrange<string>(keys.subs(round), 0, -1);
+  const [ids, total] = await Promise.all([r.lrange<string>(keys.subs(round), -limit, -1), r.llen(keys.subs(round))]);
   const [prompt, final, winner, subs, remarks] = await Promise.all([
     r.get<string>(keys.prompt(round)),
     r.get<RoundFinal>(keys.final(round)),
@@ -29,6 +31,7 @@ export async function GET(req: Request) {
     {
       round: { id: round, prompt, status, winnerId: winner?.submissionId ?? null, winnerTitle: winner?.title ?? null },
       entries: subs.filter(Boolean).reverse(),
+      total,
       remarks: remarks ?? {},
       rounds,
       current,
