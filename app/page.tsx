@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useReveal, useShell } from "@/components/AppShell";
 import { GalleryCritic, Review, ReviewStage } from "@/components/Critic";
 import DrawingCanvas, { CanvasHandle } from "@/components/DrawingCanvas";
+import { ContractAddress, XLink } from "@/components/Social";
 import { ArtFrame, Placard, shortAddr } from "@/components/Placard";
 import type { MuseumEntry, Submission } from "@/lib/rounds";
 
@@ -219,6 +220,10 @@ export default function Studio() {
               <Link className="btn btn-glass" href="/submissions">
                 See all entries
               </Link>
+            </div>
+            <div className="hero-social">
+              <ContractAddress />
+              <XLink label />
             </div>
           </div>
 

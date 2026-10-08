@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ContractAddress, XLink } from "./Social";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 type PhantomProvider = {
@@ -106,6 +107,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+          <XLink />
           <button className="btn btn-glass wallet" type="button" onClick={() => (pubkey ? disconnect() : connect())}>
             {pubkey ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
@@ -136,7 +138,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="wrap">
         <footer>
           <span>© 2026 Agent Museum</span>
-          <span>Payouts in SOL on Solana.</span>
+          <ContractAddress compact />
+          <span className="foot-right">
+            <XLink label />
+            <span>Payouts in SOL on Solana.</span>
+          </span>
         </footer>
       </div>
 

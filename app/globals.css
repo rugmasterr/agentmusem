@@ -455,3 +455,26 @@ h1 em,h2 em{color:var(--blue)}
 
 .paused-note{border:1px solid var(--gold);background:rgba(201,162,39,.14);padding:10px 12px;font-size:13.5px;color:var(--muted)}
 .paused-note b{color:var(--ink)}
+
+/* ---------- X link + contract address ---------- */
+.xlink{display:inline-flex;align-items:center;gap:8px;height:38px;min-width:38px;justify-content:center;border:1px solid var(--ink);color:var(--ink);font-family:var(--mono);font-size:12.5px;transition:background .2s,color .2s}
+.xlink svg{width:15px;height:15px}
+.xlink:hover{background:var(--ink);color:var(--panel)}
+.xlink.labelled{padding:0 12px}
+footer .xlink{height:auto;border:0;padding:0;min-width:0;font-size:12px;text-transform:none}
+footer .xlink:hover{background:none;color:var(--blue)}
+footer .foot-right{display:inline-flex;align-items:center;gap:18px;flex-wrap:wrap}
+.ca{display:inline-flex;align-items:stretch;border:1px solid var(--ink);background:var(--panel);max-width:100%;min-width:0;font-family:var(--mono);font-size:12.5px}
+.ca-label{display:grid;place-items:center;padding:0 10px;background:var(--ink);color:var(--panel);font-weight:500;letter-spacing:.06em}
+.ca code{padding:9px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-family:inherit}
+.ca button{border:0;border-left:1px solid var(--ink);background:var(--gold);color:var(--ink);padding:0 14px;cursor:pointer;font-family:inherit;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.ca button:hover{background:var(--ink);color:var(--gold)}
+.ca.pending code{color:var(--dim);font-style:italic}
+.ca.compact{font-size:11.5px;text-transform:none;letter-spacing:0}
+.ca.compact code{padding:5px 10px}
+.hero-social{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;animation:fade .9s .45s var(--ease) both}
+.hero-social .ca{flex:0 1 auto}
+@media (max-width:620px){
+  .navbar .xlink{display:none}
+  .hero-social .ca{width:100%}
+}
